@@ -33,7 +33,14 @@ export const PasswordProtection = ({ onAuthenticated }: PasswordProtectionProps)
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Tracker Pubblicità</CardTitle>
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/lovable-uploads/17d902f5-0c8c-426b-aebc-ce1adba3d45d.png" 
+              alt="ARS Logo" 
+              className="h-16 w-auto"
+            />
+          </div>
+          <CardTitle className="text-2xl font-bold">ARS Tracker</CardTitle>
           <CardDescription>Inserisci la password per accedere all'applicazione</CardDescription>
         </CardHeader>
         <CardContent>

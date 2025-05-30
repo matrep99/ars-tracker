@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -187,12 +186,21 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto p-6">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Tracker Performance Pubblicitarie {isReadOnly && "(Solo Lettura)"}
-          </h1>
-          <p className="text-lg text-gray-600">
-            Monitora e analizza le tue campagne pubblicitarie con grafici interattivi
-          </p>
+          <div className="flex items-center gap-4 mb-4">
+            <img 
+              src="/lovable-uploads/17d902f5-0c8c-426b-aebc-ce1adba3d45d.png" 
+              alt="ARS Logo" 
+              className="h-12 w-auto"
+            />
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900">
+                ARS Tracker {isReadOnly && "(Solo Lettura)"}
+              </h1>
+              <p className="text-lg text-gray-600">
+                Monitora e analizza le tue campagne pubblicitarie con grafici interattivi
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Summary Cards */}
