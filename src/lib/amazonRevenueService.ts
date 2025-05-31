@@ -5,6 +5,8 @@ export interface AmazonRevenueData {
   id?: string;
   month: string;
   fatturato: number;
+  spesa_ads: number;
+  roi: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -12,15 +14,21 @@ export interface AmazonRevenueData {
 // Save or update Amazon revenue for a specific month
 export const saveAmazonRevenue = async (
   month: string,
-  fatturato: number
+  fatturato: number,
+  spesa_ads: number
 ): Promise<AmazonRevenueData> => {
-  console.log('Saving Amazon revenue:', { month, fatturato });
+  console.log('Saving Amazon revenue:', { month, fatturato, spesa_ads });
+  
+  // Calculate ROI
+  const roi = spesa_ads > 0 ? ((fatturato - spesa_ads) / spesa_ads) * 100 : 0;
   
   const { data, error } = await supabase
     .from('amazon_revenue')
     .upsert({
       month,
-      fatturato
+      fatturato,
+      spesa_ads,
+      roi
     })
     .select()
     .single();
@@ -49,6 +57,29 @@ export const getAllAmazonRevenue = async (): Promise<AmazonRevenueData[]> => {
   }
 
   console.log('Amazon revenue fetched:', data);
+  return data || [];
+};
+
+// Get Amazon revenue filtered by date range
+export const getAmazonRevenueByDateRange = async (
+  startDate: string,
+  endDate: string
+): Promise<AmazonRevenueData[]> => {
+  console.log('Fetching Amazon revenue by date range:', { startDate, endDate });
+  
+  const { data, error } = await supabase
+    .from('amazon_revenue')
+    .select('*')
+    .gte('month', startDate)
+    .lte('month', endDate)
+    .order('month', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching Amazon revenue by date range:', error);
+    throw error;
+  }
+
+  console.log('Amazon revenue by date range fetched:', data);
   return data || [];
 };
 

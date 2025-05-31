@@ -5,34 +5,49 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Plus, TrendingUp } from 'lucide-react';
+import { Trash2, Plus, TrendingUp, DollarSign, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { 
   saveAmazonRevenue, 
   getAllAmazonRevenue, 
   deleteAmazonRevenue,
+  getAmazonRevenueByDateRange,
   AmazonRevenueData 
 } from '@/lib/amazonRevenueService';
+import type { DateRange } from './DateFilter';
 
-export const AmazonRevenue = () => {
+interface AmazonRevenueProps {
+  dateRange?: DateRange;
+}
+
+export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
   const [amazonData, setAmazonData] = useState<AmazonRevenueData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     month: new Date().toISOString().slice(0, 7), // YYYY-MM format
-    fatturato: ''
+    fatturato: '',
+    spesa_ads: ''
   });
   const { toast } = useToast();
 
   useEffect(() => {
     loadAmazonRevenue();
-  }, []);
+  }, [dateRange]);
 
   const loadAmazonRevenue = async () => {
     try {
       setIsLoading(true);
-      const data = await getAllAmazonRevenue();
+      let data: AmazonRevenueData[];
+      
+      if (dateRange && dateRange.type !== 'all' && dateRange.startDate && dateRange.endDate) {
+        data = await getAmazonRevenueByDateRange(dateRange.startDate, dateRange.endDate);
+      } else {
+        data = await getAllAmazonRevenue();
+      }
+      
       setAmazonData(data);
     } catch (error) {
       console.error('Error loading Amazon revenue:', error);
@@ -50,10 +65,12 @@ export const AmazonRevenue = () => {
     e.preventDefault();
     
     const fatturato = parseFloat(formData.fatturato);
-    if (fatturato < 0) {
+    const spesa_ads = parseFloat(formData.spesa_ads);
+    
+    if (fatturato < 0 || spesa_ads < 0) {
       toast({
-        title: "Valore non valido",
-        description: "Il fatturato deve essere un numero positivo",
+        title: "Valori non validi",
+        description: "Tutti i valori devono essere numeri positivi",
         variant: "destructive"
       });
       return;
@@ -61,23 +78,24 @@ export const AmazonRevenue = () => {
 
     try {
       setIsLoading(true);
-      await saveAmazonRevenue(`${formData.month}-01`, fatturato);
+      await saveAmazonRevenue(`${formData.month}-01`, fatturato, spesa_ads);
       await loadAmazonRevenue();
       
       setFormData({
         month: new Date().toISOString().slice(0, 7),
-        fatturato: ''
+        fatturato: '',
+        spesa_ads: ''
       });
       
       toast({
-        title: "Fatturato Amazon salvato",
+        title: "Dati Amazon salvati",
         description: `Dati per ${format(new Date(formData.month), 'MMMM yyyy', { locale: it })} salvati con successo`
       });
     } catch (error) {
       console.error('Error saving Amazon revenue:', error);
       toast({
         title: "Errore nel salvataggio",
-        description: "Impossibile salvare il fatturato Amazon",
+        description: "Impossibile salvare i dati Amazon",
         variant: "destructive"
       });
     } finally {
@@ -107,32 +125,58 @@ export const AmazonRevenue = () => {
   };
 
   const totalAmazonRevenue = amazonData.reduce((sum, record) => sum + record.fatturato, 0);
+  const totalAmazonSpend = amazonData.reduce((sum, record) => sum + record.spesa_ads, 0);
+  const overallAmazonROI = totalAmazonSpend > 0 ? ((totalAmazonRevenue - totalAmazonSpend) / totalAmazonSpend) * 100 : 0;
 
   return (
     <div className="space-y-6">
-      {/* Summary Card */}
-      <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-gray-600">Fatturato Amazon Totale</CardTitle>
-          <TrendingUp className="h-4 w-4 text-orange-600" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-gray-900">€{totalAmazonRevenue.toLocaleString()}</div>
-        </CardContent>
-      </Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Fatturato Amazon Totale</CardTitle>
+            <TrendingUp className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">€{totalAmazonRevenue.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Spesa Amazon Ads Totale</CardTitle>
+            <DollarSign className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">€{totalAmazonSpend.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">ROI Amazon Complessivo</CardTitle>
+            <Target className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${overallAmazonROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {overallAmazonROI.toFixed(1)}%
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Add New Revenue Form */}
       <Card className="bg-white shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            Aggiungi Fatturato Amazon
+            Aggiungi Dati Amazon Mensili
           </CardTitle>
-          <CardDescription>Inserisci il fatturato mensile di Amazon</CardDescription>
+          <CardDescription>Inserisci fatturato e spesa pubblicitaria Amazon per mese</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="month">Mese</Label>
                 <Input
@@ -156,9 +200,22 @@ export const AmazonRevenue = () => {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="spesa_ads">Spesa Amazon Ads (€)</Label>
+                <Input
+                  id="spesa_ads"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="300.00"
+                  value={formData.spesa_ads}
+                  onChange={(e) => setFormData(prev => ({ ...prev, spesa_ads: e.target.value }))}
+                  required
+                />
+              </div>
             </div>
             <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
-              {isLoading ? 'Salvataggio...' : 'Salva Fatturato'}
+              {isLoading ? 'Salvataggio...' : 'Salva Dati Amazon'}
             </Button>
           </form>
         </CardContent>
@@ -167,8 +224,8 @@ export const AmazonRevenue = () => {
       {/* Revenue List */}
       <Card className="bg-white shadow-lg">
         <CardHeader>
-          <CardTitle>Storico Fatturato Amazon</CardTitle>
-          <CardDescription>Visualizza e gestisci il fatturato mensile di Amazon</CardDescription>
+          <CardTitle>Report Mensile Amazon</CardTitle>
+          <CardDescription>Visualizza e gestisci i dati mensili Amazon con performance ROI</CardDescription>
         </CardHeader>
         <CardContent>
           {amazonData.length === 0 ? (
@@ -182,6 +239,9 @@ export const AmazonRevenue = () => {
                   <TableRow className="bg-gray-50">
                     <TableHead>Mese</TableHead>
                     <TableHead className="text-right">Fatturato</TableHead>
+                    <TableHead className="text-right">Spesa Ads</TableHead>
+                    <TableHead className="text-right">ROI</TableHead>
+                    <TableHead className="text-right">Margine</TableHead>
                     <TableHead className="w-[100px]">Azioni</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -192,6 +252,20 @@ export const AmazonRevenue = () => {
                         {format(new Date(record.month), 'MMMM yyyy', { locale: it })}
                       </TableCell>
                       <TableCell className="text-right">€{record.fatturato.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">€{record.spesa_ads.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge 
+                          variant={record.roi >= 0 ? "default" : "destructive"}
+                          className={record.roi >= 0 ? "bg-green-100 text-green-800" : ""}
+                        >
+                          {record.roi.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-medium ${(record.fatturato - record.spesa_ads) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          €{(record.fatturato - record.spesa_ads).toLocaleString()}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"

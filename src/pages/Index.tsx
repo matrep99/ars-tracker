@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,8 +23,10 @@ import {
   getAllCampaignsFromSupabase, 
   deleteCampaignFromSupabase,
   getCampaignById,
+  getCampaignsByDateRange,
   CampaignWithProducts 
 } from '@/lib/supabaseService';
+import { getAllAmazonRevenue, getAmazonRevenueByDateRange } from '@/lib/amazonRevenueService';
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,6 +47,12 @@ const Index = () => {
   const [productList, setProductList] = useState<{ nome: string; quantita: number }[]>([]);
   const [editingCampaign, setEditingCampaign] = useState<CampaignWithProducts | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: '',
+    endDate: '',
+    type: 'all'
+  });
+  const [amazonData, setAmazonData] = useState([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,8 +71,16 @@ const Index = () => {
     if (isAuth) {
       setIsAuthenticated(true);
       loadCampaigns();
+      loadAmazonData();
     }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && !isReadOnly) {
+      loadCampaigns();
+      loadAmazonData();
+    }
+  }, [dateRange]);
 
   const loadSharedCampaign = async (campaignId: string) => {
     try {
@@ -96,7 +111,14 @@ const Index = () => {
   const loadCampaigns = async () => {
     try {
       setIsLoading(true);
-      const allCampaigns = await getAllCampaignsFromSupabase();
+      let allCampaigns: CampaignWithProducts[];
+      
+      if (dateRange.type !== 'all' && dateRange.startDate && dateRange.endDate) {
+        allCampaigns = await getCampaignsByDateRange(dateRange.startDate, dateRange.endDate);
+      } else {
+        allCampaigns = await getAllCampaignsFromSupabase();
+      }
+      
       setCampaigns(allCampaigns);
     } catch (error) {
       console.error('Error loading campaigns:', error);
@@ -107,6 +129,20 @@ const Index = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAmazonData = async () => {
+    try {
+      let data;
+      if (dateRange.type !== 'all' && dateRange.startDate && dateRange.endDate) {
+        data = await getAmazonRevenueByDateRange(dateRange.startDate, dateRange.endDate);
+      } else {
+        data = await getAllAmazonRevenue();
+      }
+      setAmazonData(data);
+    } catch (error) {
+      console.error('Error loading Amazon data:', error);
     }
   };
 
@@ -253,6 +289,9 @@ const Index = () => {
   const overallROI = totalSpesaAds > 0 ? ((totalFatturato - totalSpesaAds) / totalSpesaAds) * 100 : 0;
   const avgValoreMedioOrdine = totalOrdini > 0 ? totalFatturato / totalOrdini : 0;
 
+  // Amazon totals for margin calculator
+  const totalAmazonSpend = amazonData.reduce((sum, record) => sum + (record.spesa_ads || 0), 0);
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -269,7 +308,7 @@ const Index = () => {
                   ARS Tracker {isReadOnly && "(Solo Lettura)"}
                 </h1>
                 <p className="text-lg text-gray-600">
-                  Monitora e analizza le tue campagne pubblicitarie con dati sempre aggiornati
+                  Monitora e analizza i dati in tempo reale
                 </p>
               </div>
             </div>
@@ -282,6 +321,16 @@ const Index = () => {
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 <span>Caricamento...</span>
               </div>
+            </div>
+          )}
+
+          {/* Date Filter */}
+          {!isReadOnly && (
+            <div className="mb-6">
+              <DateFilter
+                onDateRangeChange={setDateRange}
+                currentRange={dateRange}
+              />
             </div>
           )}
 
@@ -434,11 +483,14 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="amazon" className="space-y-6">
-              <AmazonRevenue />
+              <AmazonRevenue dateRange={dateRange} />
             </TabsContent>
 
             <TabsContent value="margin" className="space-y-6">
-              <MarginCalculator />
+              <EnhancedMarginCalculator 
+                totalCampaignSpend={totalSpesaAds}
+                totalAmazonSpend={totalAmazonSpend}
+              />
             </TabsContent>
 
             {!isReadOnly && (

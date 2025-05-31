@@ -15,6 +15,8 @@ export type Database = {
           fatturato: number
           id: string
           month: string
+          roi: number
+          spesa_ads: number
           updated_at: string
         }
         Insert: {
@@ -22,6 +24,8 @@ export type Database = {
           fatturato: number
           id?: string
           month: string
+          roi?: number
+          spesa_ads?: number
           updated_at?: string
         }
         Update: {
@@ -29,6 +33,8 @@ export type Database = {
           fatturato?: number
           id?: string
           month?: string
+          roi?: number
+          spesa_ads?: number
           updated_at?: string
         }
         Relationships: []

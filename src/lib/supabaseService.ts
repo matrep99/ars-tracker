@@ -137,3 +137,43 @@ export const getCampaignById = async (campaignId: string): Promise<CampaignWithP
   console.log('Campaign fetched:', campaign);
   return campaign;
 };
+
+// Get campaigns filtered by date range
+export const getCampaignsByDateRange = async (
+  startDate: string,
+  endDate: string
+): Promise<CampaignWithProducts[]> => {
+  console.log('Fetching campaigns by date range:', { startDate, endDate });
+  
+  const { data: campaigns, error: campaignsError } = await supabase
+    .from('campaigns')
+    .select('*')
+    .gte('data', startDate)
+    .lte('data', endDate)
+    .order('data', { ascending: false });
+
+  if (campaignsError) {
+    console.error('Error fetching campaigns by date range:', campaignsError);
+    throw campaignsError;
+  }
+
+  // Fetch products for each campaign
+  const campaignsWithProducts = await Promise.all(
+    campaigns.map(async (campaign) => {
+      const { data: products, error: productsError } = await supabase
+        .from('campaign_products')
+        .select('*')
+        .eq('campaign_id', campaign.id);
+
+      if (productsError) {
+        console.error(`Error fetching products for campaign ${campaign.id}:`, productsError);
+        return { ...campaign, products: [] };
+      }
+
+      return { ...campaign, products: products || [] };
+    })
+  );
+
+  console.log('Campaigns by date range fetched:', campaignsWithProducts);
+  return campaignsWithProducts;
+};
