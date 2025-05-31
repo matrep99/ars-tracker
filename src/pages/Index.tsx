@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -590,15 +591,15 @@ const Index = () => {
             )}
           </Tabs>
         </div>
+
+        <CampaignEditDialog
+          campaign={editingCampaign}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onSave={handleSaveEdit}
+        />
       </div>
     </TooltipProvider>
-
-    <CampaignEditDialog
-      campaign={editingCampaign}
-      open={editDialogOpen}
-      onOpenChange={setEditDialogOpen}
-      onSave={handleSaveEdit}
-    />
   );
 };
 
