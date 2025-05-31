@@ -10,7 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import { CampaignCharts } from '@/components/CampaignCharts';
 import { ProductLeaderboard } from '@/components/ProductLeaderboard';
 import { PasswordProtection } from '@/components/PasswordProtection';
-import { Plus, TrendingUp, Euro, ShoppingCart, Package, Trash2 } from 'lucide-react';
+import { AmazonRevenue } from '@/components/AmazonRevenue';
+import { MarginCalculator } from '@/components/MarginCalculator';
+import { CampaignEditDialog } from '@/components/CampaignEditDialog';
+import { Plus, TrendingUp, Euro, ShoppingCart, Package, Trash2, Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -40,6 +43,8 @@ const Index = () => {
   });
   const [productInput, setProductInput] = useState({ nome: '', quantita: '' });
   const [productList, setProductList] = useState<{ nome: string; quantita: number }[]>([]);
+  const [editingCampaign, setEditingCampaign] = useState<CampaignWithProducts | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -122,12 +127,12 @@ const Index = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const budget = parseFloat(formData.budget);
+    const spesa_ads = parseFloat(formData.budget); // Still using budget field name for DB
     const fatturato = parseFloat(formData.fatturato);
     const ordini = parseInt(formData.ordini);
     const prodotti = parseInt(formData.prodotti);
 
-    if (budget < 0 || fatturato < 0 || ordini < 0 || prodotti < 0) {
+    if (spesa_ads < 0 || fatturato < 0 || ordini < 0 || prodotti < 0) {
       toast({
         title: "Valori non validi",
         description: "Tutti i valori devono essere numeri positivi",
@@ -136,14 +141,14 @@ const Index = () => {
       return;
     }
 
-    const roi = budget > 0 ? ((fatturato - budget) / budget) * 100 : 0;
+    const roi = spesa_ads > 0 ? ((fatturato - spesa_ads) / spesa_ads) * 100 : 0;
     const valoreMedioOrdine = ordini > 0 ? fatturato / ordini : 0;
     const prodottiMediPerOrdine = ordini > 0 ? prodotti / ordini : 0;
 
     const campaignData = {
       titolo: formData.titolo || `Campagna ${campaigns.length + 1}`,
       descrizione: formData.descrizione,
-      budget,
+      budget: spesa_ads, // Still saving as budget in DB
       fatturato,
       ordini,
       prodotti,
@@ -217,6 +222,15 @@ const Index = () => {
     });
   };
 
+  const handleEditCampaign = (campaign: CampaignWithProducts) => {
+    setEditingCampaign(campaign);
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    await loadCampaigns();
+  };
+
   if (!isAuthenticated) {
     if (isLoading) {
       return (
@@ -232,10 +246,10 @@ const Index = () => {
   }
 
   const displayCampaigns = sharedCampaign ? [sharedCampaign] : campaigns;
-  const totalBudget = displayCampaigns.reduce((sum, campaign) => sum + campaign.budget, 0);
+  const totalSpesaAds = displayCampaigns.reduce((sum, campaign) => sum + campaign.budget, 0);
   const totalFatturato = displayCampaigns.reduce((sum, campaign) => sum + campaign.fatturato, 0);
   const totalOrdini = displayCampaigns.reduce((sum, campaign) => sum + campaign.ordini, 0);
-  const overallROI = totalBudget > 0 ? ((totalFatturato - totalBudget) / totalBudget) * 100 : 0;
+  const overallROI = totalSpesaAds > 0 ? ((totalFatturato - totalSpesaAds) / totalSpesaAds) * 100 : 0;
   const avgValoreMedioOrdine = totalOrdini > 0 ? totalFatturato / totalOrdini : 0;
 
   return (
@@ -270,15 +284,15 @@ const Index = () => {
             </div>
           )}
 
-          {/* Summary Cards */}
+          {/* Summary Cards - Updated labels */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Budget Totale</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">Spesa Ads Totale</CardTitle>
                 <Euro className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">€{totalBudget.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-gray-900">€{totalSpesaAds.toLocaleString()}</div>
               </CardContent>
             </Card>
 
@@ -316,10 +330,12 @@ const Index = () => {
           </div>
 
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="campaigns">Campagne</TabsTrigger>
               <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
+              <TabsTrigger value="amazon">Amazon</TabsTrigger>
+              <TabsTrigger value="margin">Calcolatore Margini</TabsTrigger>
               {!isReadOnly && <TabsTrigger value="add">Aggiungi</TabsTrigger>}
             </TabsList>
 
@@ -345,7 +361,7 @@ const Index = () => {
                           <TableRow className="bg-gray-50">
                             <TableHead>Campagna</TableHead>
                             <TableHead>Data</TableHead>
-                            <TableHead className="text-right">Budget</TableHead>
+                            <TableHead className="text-right">Spesa Ads</TableHead>
                             <TableHead className="text-right">Fatturato</TableHead>
                             <TableHead className="text-right">Ordini</TableHead>
                             <TableHead className="text-right">ROI</TableHead>
@@ -372,6 +388,15 @@ const Index = () => {
                               <TableCell className="text-right">€{campaign.valore_medio_ordine.toFixed(2)}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditCampaign(campaign)}
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    title="Modifica campagna"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -405,6 +430,14 @@ const Index = () => {
 
             <TabsContent value="products" className="space-y-6">
               <ProductLeaderboard campaigns={displayCampaigns} />
+            </TabsContent>
+
+            <TabsContent value="amazon" className="space-y-6">
+              <AmazonRevenue />
+            </TabsContent>
+
+            <TabsContent value="margin" className="space-y-6">
+              <MarginCalculator />
             </TabsContent>
 
             {!isReadOnly && (
@@ -454,7 +487,7 @@ const Index = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="budget">Budget Speso (€)</Label>
+                          <Label htmlFor="budget">Spesa Ads (€)</Label>
                           <Input
                             id="budget"
                             type="number"
@@ -559,6 +592,13 @@ const Index = () => {
         </div>
       </div>
     </TooltipProvider>
+
+    <CampaignEditDialog
+      campaign={editingCampaign}
+      open={editDialogOpen}
+      onOpenChange={setEditDialogOpen}
+      onSave={handleSaveEdit}
+    />
   );
 };
 

@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      amazon_revenue: {
+        Row: {
+          created_at: string
+          fatturato: number
+          id: string
+          month: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fatturato: number
+          id?: string
+          month: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fatturato?: number
+          id?: string
+          month?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campaign_products: {
         Row: {
           campaign_id: string

@@ -1,11 +1,10 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CampaignData {
   id?: string;
   titolo: string;
   descrizione: string;
-  budget: number;
+  budget: number; // Still called budget in DB, but renamed to "spesa ads" in UI
   fatturato: number;
   ordini: number;
   prodotti: number;
