@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,22 +7,28 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CampaignRecord, Product, saveCampaign, getAllCampaigns, deleteCampaign } from '@/lib/campaignStorage';
 import { CampaignCharts } from '@/components/CampaignCharts';
-import { ProductRanking } from '@/components/ProductRanking';
-import { DataSharing } from '@/components/DataSharing';
+import { ProductLeaderboard } from '@/components/ProductLeaderboard';
 import { PasswordProtection } from '@/components/PasswordProtection';
 import { Plus, TrendingUp, Euro, ShoppingCart, Package, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { 
+  saveCampaignToSupabase, 
+  getAllCampaignsFromSupabase, 
+  deleteCampaignFromSupabase,
+  getCampaignById,
+  CampaignWithProducts 
+} from '@/lib/supabaseService';
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
-  const [sharedData, setSharedData] = useState<CampaignRecord[] | null>(null);
+  const [campaigns, setCampaigns] = useState<CampaignWithProducts[]>([]);
+  const [sharedCampaign, setSharedCampaign] = useState<CampaignWithProducts | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     titolo: '',
     descrizione: '',
@@ -32,26 +39,17 @@ const Index = () => {
     data: new Date().toISOString().split('T')[0]
   });
   const [productInput, setProductInput] = useState({ nome: '', quantita: '' });
-  const [productList, setProductList] = useState<Product[]>([]);
+  const [productList, setProductList] = useState<{ nome: string; quantita: number }[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check for shared data in URL
+    // Check for shared campaign in URL
     const urlParams = new URLSearchParams(window.location.search);
-    const sharedId = urlParams.get('shared');
-    const encodedData = urlParams.get('data');
+    const sharedId = urlParams.get('id');
     
-    if (sharedId || encodedData) {
+    if (sharedId) {
       setIsReadOnly(true);
-      if (encodedData) {
-        try {
-          const decodedData = JSON.parse(atob(encodedData));
-          setSharedData(decodedData.campaigns || []);
-          setIsAuthenticated(true);
-        } catch (error) {
-          console.error('Errore nel caricamento dei dati condivisi:', error);
-        }
-      }
+      loadSharedCampaign(sharedId);
       return;
     }
 
@@ -63,22 +61,52 @@ const Index = () => {
     }
   }, []);
 
+  const loadSharedCampaign = async (campaignId: string) => {
+    try {
+      setIsLoading(true);
+      const campaign = await getCampaignById(campaignId);
+      if (campaign) {
+        setSharedCampaign(campaign);
+        setIsAuthenticated(true);
+      } else {
+        toast({
+          title: "Campagna non trovata",
+          description: "La campagna richiesta non esiste o è stata eliminata",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error loading shared campaign:', error);
+      toast({
+        title: "Errore nel caricamento",
+        description: "Impossibile caricare la campagna condivisa",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const loadCampaigns = async () => {
     try {
-      const allCampaigns = await getAllCampaigns();
-      setCampaigns(allCampaigns.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()));
+      setIsLoading(true);
+      const allCampaigns = await getAllCampaignsFromSupabase();
+      setCampaigns(allCampaigns);
     } catch (error) {
+      console.error('Error loading campaigns:', error);
       toast({
         title: "Errore nel caricamento",
         description: "Impossibile caricare le campagne salvate",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const addProduct = () => {
     if (productInput.nome && productInput.quantita) {
-      const newProduct: Product = {
+      const newProduct = {
         nome: productInput.nome,
         quantita: parseInt(productInput.quantita)
       };
@@ -112,25 +140,25 @@ const Index = () => {
     const valoreMedioOrdine = ordini > 0 ? fatturato / ordini : 0;
     const prodottiMediPerOrdine = ordini > 0 ? prodotti / ordini : 0;
 
-    const newCampaign: CampaignRecord = {
-      id: Date.now().toString(),
+    const campaignData = {
       titolo: formData.titolo || `Campagna ${campaigns.length + 1}`,
       descrizione: formData.descrizione,
       budget,
       fatturato,
       ordini,
       prodotti,
-      prodottiVenduti: productList,
       data: formData.data,
       roi,
-      valoreMedioOrdine,
-      prodottiMediPerOrdine,
-      creatoIl: new Date().toISOString()
+      valore_medio_ordine: valoreMedioOrdine,
+      prodotti_medi_per_ordine: prodottiMediPerOrdine
     };
 
     try {
-      await saveCampaign(newCampaign);
+      setIsLoading(true);
+      await saveCampaignToSupabase(campaignData, productList);
       await loadCampaigns();
+      
+      // Reset form
       setFormData({
         titolo: '',
         descrizione: '',
@@ -141,41 +169,69 @@ const Index = () => {
         data: new Date().toISOString().split('T')[0]
       });
       setProductList([]);
+      
       toast({
         title: "Campagna salvata",
-        description: `La campagna "${newCampaign.titolo}" è stata salvata con successo`
+        description: `La campagna "${campaignData.titolo}" è stata salvata con successo`
       });
     } catch (error) {
+      console.error('Error saving campaign:', error);
       toast({
         title: "Errore nel salvataggio",
         description: "Impossibile salvare la campagna",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDeleteCampaign = async (id: string) => {
     try {
-      await deleteCampaign(id);
+      setIsLoading(true);
+      await deleteCampaignFromSupabase(id);
       await loadCampaigns();
       toast({
         title: "Campagna eliminata",
         description: "La campagna è stata rimossa con successo"
       });
     } catch (error) {
+      console.error('Error deleting campaign:', error);
       toast({
         title: "Errore nell'eliminazione",
         description: "Impossibile eliminare la campagna",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const generateShareLink = (campaignId: string) => {
+    const shareUrl = `${window.location.origin}?id=${campaignId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      toast({
+        title: "Link copiato",
+        description: "Il link di condivisione è stato copiato negli appunti"
+      });
+    });
+  };
+
   if (!isAuthenticated) {
+    if (isLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Caricamento in corso...</p>
+          </div>
+        </div>
+      );
+    }
     return <PasswordProtection onAuthenticated={() => setIsAuthenticated(true)} />;
   }
 
-  const displayCampaigns = sharedData || campaigns;
+  const displayCampaigns = sharedCampaign ? [sharedCampaign] : campaigns;
   const totalBudget = displayCampaigns.reduce((sum, campaign) => sum + campaign.budget, 0);
   const totalFatturato = displayCampaigns.reduce((sum, campaign) => sum + campaign.fatturato, 0);
   const totalOrdini = displayCampaigns.reduce((sum, campaign) => sum + campaign.ordini, 0);
@@ -197,11 +253,21 @@ const Index = () => {
                 ARS Tracker {isReadOnly && "(Solo Lettura)"}
               </h1>
               <p className="text-lg text-gray-600">
-                Monitora e analizza le tue campagne pubblicitarie con grafici interattivi
+                Monitora e analizza le tue campagne pubblicitarie con dati sempre aggiornati
               </p>
             </div>
           </div>
         </div>
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Caricamento...</span>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -249,12 +315,11 @@ const Index = () => {
         </div>
 
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="campaigns">Campagne</TabsTrigger>
-            <TabsTrigger value="products">Prodotti</TabsTrigger>
+            <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
             {!isReadOnly && <TabsTrigger value="add">Aggiungi</TabsTrigger>}
-            {!isReadOnly && <TabsTrigger value="share">Condividi</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -284,7 +349,7 @@ const Index = () => {
                           <TableHead className="text-right">Ordini</TableHead>
                           <TableHead className="text-right">ROI</TableHead>
                           <TableHead className="text-right">Val. Medio Ordine</TableHead>
-                          {!isReadOnly && <TableHead className="w-[100px]">Azioni</TableHead>}
+                          <TableHead className="w-[100px]">Azioni</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -303,19 +368,30 @@ const Index = () => {
                                 {campaign.roi.toFixed(1)}%
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right">€{campaign.valoreMedioOrdine.toFixed(2)}</TableCell>
-                            {!isReadOnly && (
-                              <TableCell>
+                            <TableCell className="text-right">€{campaign.valore_medio_ordine.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleDeleteCampaign(campaign.id)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => generateShareLink(campaign.id!)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  title="Condividi campagna"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  📤
                                 </Button>
-                              </TableCell>
-                            )}
+                                {!isReadOnly && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteCampaign(campaign.id!)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -327,7 +403,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6">
-            <ProductRanking campaigns={displayCampaigns} />
+            <ProductLeaderboard campaigns={displayCampaigns} />
           </TabsContent>
 
           {!isReadOnly && (
@@ -470,18 +546,12 @@ const Index = () => {
                       )}
                     </div>
 
-                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                      Salva Campagna
+                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+                      {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
-            </TabsContent>
-          )}
-
-          {!isReadOnly && (
-            <TabsContent value="share" className="space-y-6">
-              <DataSharing campaigns={campaigns} />
             </TabsContent>
           )}
         </Tabs>

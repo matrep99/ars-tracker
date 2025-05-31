@@ -9,6 +9,86 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      campaign_products: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          nome: string
+          quantita: number
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          nome: string
+          quantita: number
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          quantita?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_products_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          budget: number
+          created_at: string
+          data: string
+          descrizione: string | null
+          fatturato: number
+          id: string
+          ordini: number
+          prodotti: number
+          prodotti_medi_per_ordine: number
+          roi: number
+          titolo: string
+          updated_at: string
+          valore_medio_ordine: number
+        }
+        Insert: {
+          budget: number
+          created_at?: string
+          data: string
+          descrizione?: string | null
+          fatturato: number
+          id?: string
+          ordini: number
+          prodotti: number
+          prodotti_medi_per_ordine: number
+          roi: number
+          titolo: string
+          updated_at?: string
+          valore_medio_ordine: number
+        }
+        Update: {
+          budget?: number
+          created_at?: string
+          data?: string
+          descrizione?: string | null
+          fatturato?: number
+          id?: string
+          ordini?: number
+          prodotti?: number
+          prodotti_medi_per_ordine?: number
+          roi?: number
+          titolo?: string
+          updated_at?: string
+          valore_medio_ordine?: number
+        }
+        Relationships: []
+      }
       task_files: {
         Row: {
           created_at: string

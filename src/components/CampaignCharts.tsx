@@ -1,68 +1,97 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { CampaignRecord } from '@/lib/campaignStorage';
-import { format } from 'date-fns';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { CampaignWithProducts } from '@/lib/supabaseService';
+import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 interface CampaignChartsProps {
-  campaigns: CampaignRecord[];
+  campaigns: CampaignWithProducts[];
 }
 
 export const CampaignCharts = ({ campaigns }: CampaignChartsProps) => {
+  if (campaigns.length === 0) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Andamento ROI</CardTitle>
+            <CardDescription>Evoluzione del ROI nel tempo</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center h-64">
+            <p className="text-gray-500">Aggiungi campagne per visualizzare i grafici</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Budget vs Fatturato</CardTitle>
+            <CardDescription>Confronto tra investimenti e ricavi</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center h-64">
+            <p className="text-gray-500">Aggiungi campagne per visualizzare i grafici</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Prepare data for charts
   const chartData = campaigns
     .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
     .map(campaign => ({
-      data: format(new Date(campaign.data), 'dd MMM', { locale: it }),
-      dataCompleta: campaign.data,
+      nome: campaign.titolo,
+      data: format(parseISO(campaign.data), 'dd/MM', { locale: it }),
       budget: campaign.budget,
       fatturato: campaign.fatturato,
       roi: campaign.roi,
-      valoreMedioOrdine: campaign.valoreMedioOrdine,
-      titolo: campaign.titolo
+      ordini: campaign.ordini,
+      valoreMedioOrdine: campaign.valore_medio_ordine
     }));
-
-  if (campaigns.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Grafici delle Performance</CardTitle>
-          <CardDescription>Aggiungi alcune campagne per visualizzare i grafici</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-64">
-          <p className="text-gray-500">Nessun dato disponibile</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Fatturato vs Budget nel Tempo</CardTitle>
-          <CardDescription>Confronta la spesa con il fatturato generato</CardDescription>
+          <CardTitle>Andamento ROI</CardTitle>
+          <CardDescription>Evoluzione del ROI nel tempo</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="data" />
+              <YAxis />
+              <Tooltip 
+                formatter={(value: number) => [`${value.toFixed(1)}%`, 'ROI']}
+                labelFormatter={(label) => `Data: ${label}`}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="roi" 
+                stroke="#10b981" 
+                strokeWidth={2}
+                dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Budget vs Fatturato</CardTitle>
+          <CardDescription>Confronto tra investimenti e ricavi</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="data" 
-                tick={{ fontSize: 12 }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
+              <XAxis dataKey="data" />
               <YAxis />
               <Tooltip 
-                formatter={(value: number, name: string) => [
-                  `€${value.toLocaleString()}`,
-                  name === 'budget' ? 'Budget' : 'Fatturato'
-                ]}
+                formatter={(value: number) => [`€${value.toLocaleString()}`, value === chartData[0]?.budget ? 'Budget' : 'Fatturato']}
                 labelFormatter={(label) => `Data: ${label}`}
               />
-              <Legend />
               <Bar dataKey="budget" fill="#3b82f6" name="Budget" />
               <Bar dataKey="fatturato" fill="#10b981" name="Fatturato" />
             </BarChart>
@@ -72,54 +101,35 @@ export const CampaignCharts = ({ campaigns }: CampaignChartsProps) => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Andamento del ROI</CardTitle>
-          <CardDescription>Monitora il ritorno sull'investimento nel tempo</CardDescription>
+          <CardTitle>Numero di Ordini</CardTitle>
+          <CardDescription>Ordini generati per campagna</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="data" 
-                tick={{ fontSize: 12 }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
+              <XAxis dataKey="data" />
               <YAxis />
               <Tooltip 
-                formatter={(value: number) => [`${value.toFixed(1)}%`, 'ROI']}
+                formatter={(value: number) => [value, 'Ordini']}
                 labelFormatter={(label) => `Data: ${label}`}
               />
-              <Line 
-                type="monotone" 
-                dataKey="roi" 
-                stroke="#8b5cf6" 
-                strokeWidth={3}
-                dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
+              <Bar dataKey="ordini" fill="#f59e0b" />
+            </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      <Card className="lg:col-span-2">
+      <Card>
         <CardHeader>
-          <CardTitle>Variazione del Valore Medio Ordine</CardTitle>
-          <CardDescription>Traccia l'evoluzione del valore medio degli ordini</CardDescription>
+          <CardTitle>Valore Medio Ordine</CardTitle>
+          <CardDescription>AOV per ogni campagna</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="data" 
-                tick={{ fontSize: 12 }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
+              <XAxis dataKey="data" />
               <YAxis />
               <Tooltip 
                 formatter={(value: number) => [`€${value.toFixed(2)}`, 'Valore Medio Ordine']}
@@ -128,10 +138,9 @@ export const CampaignCharts = ({ campaigns }: CampaignChartsProps) => {
               <Line 
                 type="monotone" 
                 dataKey="valoreMedioOrdine" 
-                stroke="#f59e0b" 
-                strokeWidth={3}
-                dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
+                stroke="#8b5cf6" 
+                strokeWidth={2}
+                dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
               />
             </LineChart>
           </ResponsiveContainer>
