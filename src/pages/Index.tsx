@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { CampaignCharts } from '@/components/CampaignCharts';
 import { ProductLeaderboard } from '@/components/ProductLeaderboard';
@@ -239,324 +239,326 @@ const Index = () => {
   const avgValoreMedioOrdine = totalOrdini > 0 ? totalFatturato / totalOrdini : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <img 
-              src="/lovable-uploads/17d902f5-0c8c-426b-aebc-ce1adba3d45d.png" 
-              alt="ARS Logo" 
-              className="h-12 w-auto"
-            />
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900">
-                ARS Tracker {isReadOnly && "(Solo Lettura)"}
-              </h1>
-              <p className="text-lg text-gray-600">
-                Monitora e analizza le tue campagne pubblicitarie con dati sempre aggiornati
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Loading indicator */}
-        {isLoading && (
-          <div className="fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              <span>Caricamento...</span>
-            </div>
-          </div>
-        )}
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Budget Totale</CardTitle>
-              <Euro className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">€{totalBudget.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Fatturato Totale</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">€{totalFatturato.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">ROI Complessivo</CardTitle>
-              <TrendingUp className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${overallROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {overallROI.toFixed(1)}%
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="container mx-auto p-6">
+          <div className="mb-8">
+            <div className="flex items-center gap-4 mb-4">
+              <img 
+                src="/lovable-uploads/17d902f5-0c8c-426b-aebc-ce1adba3d45d.png" 
+                alt="ARS Logo" 
+                className="h-12 w-auto"
+              />
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900">
+                  ARS Tracker {isReadOnly && "(Solo Lettura)"}
+                </h1>
+                <p className="text-lg text-gray-600">
+                  Monitora e analizza le tue campagne pubblicitarie con dati sempre aggiornati
+                </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Valore Medio Ordine</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">€{avgValoreMedioOrdine.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Caricamento...</span>
+              </div>
+            </div>
+          )}
 
-        <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="campaigns">Campagne</TabsTrigger>
-            <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
-            {!isReadOnly && <TabsTrigger value="add">Aggiungi</TabsTrigger>}
-          </TabsList>
-
-          <TabsContent value="dashboard" className="space-y-6">
-            <CampaignCharts campaigns={displayCampaigns} />
-          </TabsContent>
-
-          <TabsContent value="campaigns" className="space-y-6">
-            <Card className="bg-white shadow-lg">
-              <CardHeader>
-                <CardTitle>Tutte le Campagne</CardTitle>
-                <CardDescription>Visualizza e gestisci le tue campagne pubblicitarie</CardDescription>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Budget Totale</CardTitle>
+                <Euro className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                {displayCampaigns.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">Nessuna campagna trovata. Aggiungi la tua prima campagna per iniziare!</p>
-                  </div>
-                ) : (
-                  <div className="rounded-md border overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50">
-                          <TableHead>Campagna</TableHead>
-                          <TableHead>Data</TableHead>
-                          <TableHead className="text-right">Budget</TableHead>
-                          <TableHead className="text-right">Fatturato</TableHead>
-                          <TableHead className="text-right">Ordini</TableHead>
-                          <TableHead className="text-right">ROI</TableHead>
-                          <TableHead className="text-right">Val. Medio Ordine</TableHead>
-                          <TableHead className="w-[100px]">Azioni</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {displayCampaigns.map((campaign) => (
-                          <TableRow key={campaign.id} className="hover:bg-gray-50">
-                            <TableCell className="font-medium">{campaign.titolo}</TableCell>
-                            <TableCell>{format(new Date(campaign.data), 'dd MMM yyyy', { locale: it })}</TableCell>
-                            <TableCell className="text-right">€{campaign.budget.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">€{campaign.fatturato.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{campaign.ordini}</TableCell>
-                            <TableCell className="text-right">
-                              <Badge 
-                                variant={campaign.roi >= 0 ? "default" : "destructive"}
-                                className={campaign.roi >= 0 ? "bg-green-100 text-green-800" : ""}
-                              >
-                                {campaign.roi.toFixed(1)}%
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">€{campaign.valore_medio_ordine.toFixed(2)}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => generateShareLink(campaign.id!)}
-                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                  title="Condividi campagna"
+                <div className="text-2xl font-bold text-gray-900">€{totalBudget.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Fatturato Totale</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">€{totalFatturato.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">ROI Complessivo</CardTitle>
+                <TrendingUp className="h-4 w-4 text-purple-600" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${overallROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {overallROI.toFixed(1)}%
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Valore Medio Ordine</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-orange-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">€{avgValoreMedioOrdine.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Tabs defaultValue="dashboard" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="campaigns">Campagne</TabsTrigger>
+              <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
+              {!isReadOnly && <TabsTrigger value="add">Aggiungi</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="dashboard" className="space-y-6">
+              <CampaignCharts campaigns={displayCampaigns} />
+            </TabsContent>
+
+            <TabsContent value="campaigns" className="space-y-6">
+              <Card className="bg-white shadow-lg">
+                <CardHeader>
+                  <CardTitle>Tutte le Campagne</CardTitle>
+                  <CardDescription>Visualizza e gestisci le tue campagne pubblicitarie</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {displayCampaigns.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">Nessuna campagna trovata. Aggiungi la tua prima campagna per iniziare!</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50">
+                            <TableHead>Campagna</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead className="text-right">Budget</TableHead>
+                            <TableHead className="text-right">Fatturato</TableHead>
+                            <TableHead className="text-right">Ordini</TableHead>
+                            <TableHead className="text-right">ROI</TableHead>
+                            <TableHead className="text-right">Val. Medio Ordine</TableHead>
+                            <TableHead className="w-[100px]">Azioni</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {displayCampaigns.map((campaign) => (
+                            <TableRow key={campaign.id} className="hover:bg-gray-50">
+                              <TableCell className="font-medium">{campaign.titolo}</TableCell>
+                              <TableCell>{format(new Date(campaign.data), 'dd MMM yyyy', { locale: it })}</TableCell>
+                              <TableCell className="text-right">€{campaign.budget.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">€{campaign.fatturato.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{campaign.ordini}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge 
+                                  variant={campaign.roi >= 0 ? "default" : "destructive"}
+                                  className={campaign.roi >= 0 ? "bg-green-100 text-green-800" : ""}
                                 >
-                                  📤
-                                </Button>
-                                {!isReadOnly && (
+                                  {campaign.roi.toFixed(1)}%
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">€{campaign.valore_medio_ordine.toFixed(2)}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleDeleteCampaign(campaign.id!)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => generateShareLink(campaign.id!)}
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    title="Condividi campagna"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    📤
                                   </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="products" className="space-y-6">
-            <ProductLeaderboard campaigns={displayCampaigns} />
-          </TabsContent>
-
-          {!isReadOnly && (
-            <TabsContent value="add" className="space-y-6">
-              <Card className="bg-white shadow-lg max-w-4xl mx-auto">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Aggiungi Nuova Campagna
-                  </CardTitle>
-                  <CardDescription>Inserisci i dati della tua campagna pubblicitaria</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="titolo">Titolo Campagna</Label>
-                        <Input
-                          id="titolo"
-                          placeholder="es. Campagna Facebook Natale"
-                          value={formData.titolo}
-                          onChange={(e) => setFormData(prev => ({ ...prev, titolo: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="data">Data</Label>
-                        <Input
-                          id="data"
-                          type="date"
-                          value={formData.data}
-                          onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
-                          required
-                        />
-                      </div>
+                                  {!isReadOnly && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteCampaign(campaign.id!)}
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="descrizione">Descrizione della Campagna</Label>
-                      <Textarea
-                        id="descrizione"
-                        placeholder="Descrivi la tua campagna pubblicitaria..."
-                        value={formData.descrizione}
-                        onChange={(e) => setFormData(prev => ({ ...prev, descrizione: e.target.value }))}
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="budget">Budget Speso (€)</Label>
-                        <Input
-                          id="budget"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="1000.00"
-                          value={formData.budget}
-                          onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="fatturato">Fatturato Generato (€)</Label>
-                        <Input
-                          id="fatturato"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="1500.00"
-                          value={formData.fatturato}
-                          onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ordini">Numero di Ordini</Label>
-                        <Input
-                          id="ordini"
-                          type="number"
-                          min="0"
-                          placeholder="25"
-                          value={formData.ordini}
-                          onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="prodotti">Prodotti Venduti</Label>
-                        <Input
-                          id="prodotti"
-                          type="number"
-                          min="0"
-                          placeholder="50"
-                          value={formData.prodotti}
-                          onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <Label>Prodotti Più Venduti</Label>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <Input
-                          placeholder="Nome prodotto"
-                          value={productInput.nome}
-                          onChange={(e) => setProductInput(prev => ({ ...prev, nome: e.target.value }))}
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Quantità"
-                          value={productInput.quantita}
-                          onChange={(e) => setProductInput(prev => ({ ...prev, quantita: e.target.value }))}
-                        />
-                        <Button type="button" onClick={addProduct}>
-                          Aggiungi Prodotto
-                        </Button>
-                      </div>
-
-                      {productList.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="font-medium">Prodotti aggiunti:</h4>
-                          <div className="space-y-1">
-                            {productList.map((product, index) => (
-                              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                <span>{product.nome} - Qtà: {product.quantita}</span>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeProduct(index)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
-                      {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
-                    </Button>
-                  </form>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
-          )}
-        </Tabs>
+
+            <TabsContent value="products" className="space-y-6">
+              <ProductLeaderboard campaigns={displayCampaigns} />
+            </TabsContent>
+
+            {!isReadOnly && (
+              <TabsContent value="add" className="space-y-6">
+                <Card className="bg-white shadow-lg max-w-4xl mx-auto">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Plus className="h-5 w-5" />
+                      Aggiungi Nuova Campagna
+                    </CardTitle>
+                    <CardDescription>Inserisci i dati della tua campagna pubblicitaria</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="titolo">Titolo Campagna</Label>
+                          <Input
+                            id="titolo"
+                            placeholder="es. Campagna Facebook Natale"
+                            value={formData.titolo}
+                            onChange={(e) => setFormData(prev => ({ ...prev, titolo: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="data">Data</Label>
+                          <Input
+                            id="data"
+                            type="date"
+                            value={formData.data}
+                            onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="descrizione">Descrizione della Campagna</Label>
+                        <Textarea
+                          id="descrizione"
+                          placeholder="Descrivi la tua campagna pubblicitaria..."
+                          value={formData.descrizione}
+                          onChange={(e) => setFormData(prev => ({ ...prev, descrizione: e.target.value }))}
+                          rows={3}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="budget">Budget Speso (€)</Label>
+                          <Input
+                            id="budget"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="1000.00"
+                            value={formData.budget}
+                            onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="fatturato">Fatturato Generato (€)</Label>
+                          <Input
+                            id="fatturato"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="1500.00"
+                            value={formData.fatturato}
+                            onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="ordini">Numero di Ordini</Label>
+                          <Input
+                            id="ordini"
+                            type="number"
+                            min="0"
+                            placeholder="25"
+                            value={formData.ordini}
+                            onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="prodotti">Prodotti Venduti</Label>
+                          <Input
+                            id="prodotti"
+                            type="number"
+                            min="0"
+                            placeholder="50"
+                            value={formData.prodotti}
+                            onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <Label>Prodotti Più Venduti</Label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <Input
+                            placeholder="Nome prodotto"
+                            value={productInput.nome}
+                            onChange={(e) => setProductInput(prev => ({ ...prev, nome: e.target.value }))}
+                          />
+                          <Input
+                            type="number"
+                            placeholder="Quantità"
+                            value={productInput.quantita}
+                            onChange={(e) => setProductInput(prev => ({ ...prev, quantita: e.target.value }))}
+                          />
+                          <Button type="button" onClick={addProduct}>
+                            Aggiungi Prodotto
+                          </Button>
+                        </div>
+
+                        {productList.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="font-medium">Prodotti aggiunti:</h4>
+                            <div className="space-y-1">
+                              {productList.map((product, index) => (
+                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                  <span>{product.nome} - Qtà: {product.quantita}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeProduct(index)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+                        {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 
