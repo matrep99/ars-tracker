@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import {
   Card,
@@ -29,6 +30,7 @@ import {
   CampaignData,
   CampaignWithProducts,
 } from '@/lib/supabaseService';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   Tabs,
@@ -326,8 +328,16 @@ const Index = () => {
     return campaignDate >= startDate && campaignDate <= endDate;
   });
 
+  const handleDateRangeChange = (range: DateRange) => {
+    setDateRange(range);
+  };
+
+  const handleAuthenticationChange = (authenticated: boolean) => {
+    setIsAuthenticated(authenticated);
+  };
+
   return (
-    <PasswordProtection onAuthenticated={setIsAuthenticated}>
+    <PasswordProtection onAuthenticated={handleAuthenticationChange}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
@@ -337,7 +347,7 @@ const Index = () => {
                 <h1 className="text-3xl font-bold text-gray-900">Dashboard Marketing</h1>
                 <p className="text-gray-600 mt-1">Monitora e analizza i dati in tempo reale</p>
               </div>
-              <DateFilter onDateRangeChange={setDateRange} />
+              <DateFilter onDateRangeChange={handleDateRangeChange} />
             </div>
           </div>
         </div>
@@ -440,8 +450,8 @@ const Index = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formData.budget}
-                          onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                          value={formData.budget || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
                           placeholder="1000.00"
                           required
                         />
@@ -453,8 +463,8 @@ const Index = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formData.fatturato}
-                          onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
+                          value={formData.fatturato || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, fatturato: parseFloat(e.target.value) || 0 }))}
                           placeholder="3000.00"
                           required
                         />
@@ -465,8 +475,8 @@ const Index = () => {
                           id="ordini"
                           type="number"
                           min="1"
-                          value={formData.ordini}
-                          onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
+                          value={formData.ordini || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, ordini: parseInt(e.target.value) || 0 }))}
                           placeholder="15"
                           required
                         />
@@ -477,8 +487,8 @@ const Index = () => {
                           id="prodotti"
                           type="number"
                           min="1"
-                          value={formData.prodotti}
-                          onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
+                          value={formData.prodotti || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, prodotti: parseInt(e.target.value) || 0 }))}
                           placeholder="45"
                           required
                         />
@@ -656,7 +666,7 @@ const Index = () => {
 
             <TabsContent value="analytics" className="space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <PerformanceCharts campaigns={filteredCampaigns} />
+                <PerformanceCharts records={[]} />
                 <CampaignCharts campaigns={filteredCampaigns} />
               </div>
               <ProductLeaderboard campaigns={filteredCampaigns} />
