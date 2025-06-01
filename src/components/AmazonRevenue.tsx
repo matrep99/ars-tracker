@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Plus, TrendingUp, DollarSign, Target, Package } from 'lucide-react';
+import { Trash2, Plus, TrendingUp, DollarSign, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { 
@@ -17,7 +17,6 @@ import {
   getAmazonRevenueByDateRange,
   AmazonRevenueData 
 } from '@/lib/amazonRevenueService';
-import { AmazonProductInput } from '@/components/AmazonProductInput';
 import type { DateRange } from './DateFilter';
 
 interface AmazonRevenueProps {
@@ -32,7 +31,6 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
     fatturato: '',
     spesa_ads: ''
   });
-  const [products, setProducts] = useState<{ nome: string; quantita: number; fatturato_prodotto?: number }[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -80,7 +78,7 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
 
     try {
       setIsLoading(true);
-      await saveAmazonRevenue(`${formData.month}-01`, fatturato, spesa_ads, products);
+      await saveAmazonRevenue(`${formData.month}-01`, fatturato, spesa_ads);
       await loadAmazonRevenue();
       
       setFormData({
@@ -88,7 +86,6 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
         fatturato: '',
         spesa_ads: ''
       });
-      setProducts([]);
       
       toast({
         title: "Dati Amazon salvati",
@@ -131,15 +128,10 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
   const totalAmazonSpend = amazonData.reduce((sum, record) => sum + record.spesa_ads, 0);
   const overallAmazonROI = totalAmazonSpend > 0 ? ((totalAmazonRevenue - totalAmazonSpend) / totalAmazonSpend) * 100 : 0;
 
-  // Calculate total product quantities for summary
-  const totalProductsSold = amazonData.reduce((sum, record) => {
-    return sum + (record.amazon_products?.reduce((productSum, product) => productSum + product.quantita, 0) || 0);
-  }, 0);
-
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Fatturato Amazon Totale</CardTitle>
@@ -171,16 +163,6 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Prodotti Venduti</CardTitle>
-            <Package className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{totalProductsSold.toLocaleString()}</div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Add New Revenue Form */}
@@ -190,10 +172,10 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
             <Plus className="h-5 w-5" />
             Aggiungi Dati Amazon Mensili
           </CardTitle>
-          <CardDescription>Inserisci fatturato, spesa pubblicitaria e prodotti venduti Amazon per mese</CardDescription>
+          <CardDescription>Inserisci fatturato e spesa pubblicitaria Amazon per mese</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="month">Mese</Label>
@@ -232,12 +214,6 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
                 />
               </div>
             </div>
-
-            <AmazonProductInput 
-              products={products}
-              onProductsChange={setProducts}
-            />
-
             <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
               {isLoading ? 'Salvataggio...' : 'Salva Dati Amazon'}
             </Button>
@@ -249,7 +225,7 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
       <Card className="bg-white shadow-lg">
         <CardHeader>
           <CardTitle>Report Mensile Amazon</CardTitle>
-          <CardDescription>Visualizza e gestisci i dati mensili Amazon con performance ROI e dettaglio prodotti</CardDescription>
+          <CardDescription>Visualizza e gestisci i dati mensili Amazon con performance ROI</CardDescription>
         </CardHeader>
         <CardContent>
           {amazonData.length === 0 ? (
@@ -257,79 +233,53 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
               <p className="text-gray-500">Nessun dato Amazon trovato. Aggiungi il primo record per iniziare!</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {amazonData.map((record) => (
-                <div key={record.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="font-semibold text-lg">
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead>Mese</TableHead>
+                    <TableHead className="text-right">Fatturato</TableHead>
+                    <TableHead className="text-right">Spesa Ads</TableHead>
+                    <TableHead className="text-right">ROI</TableHead>
+                    <TableHead className="text-right">Margine</TableHead>
+                    <TableHead className="w-[100px]">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {amazonData.map((record) => (
+                    <TableRow key={record.id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium">
                         {format(new Date(record.month), 'MMMM yyyy', { locale: it })}
-                      </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm">
-                        <div>
-                          <span className="text-gray-600">Fatturato:</span>
-                          <div className="font-medium">€{record.fatturato.toLocaleString()}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Spesa Ads:</span>
-                          <div className="font-medium">€{record.spesa_ads.toLocaleString()}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">ROI:</span>
-                          <Badge 
-                            variant={record.roi >= 0 ? "default" : "destructive"}
-                            className={record.roi >= 0 ? "bg-green-100 text-green-800" : ""}
-                          >
-                            {record.roi.toFixed(1)}%
-                          </Badge>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Margine:</span>
-                          <div className={`font-medium ${(record.fatturato - record.spesa_ads) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            €{(record.fatturato - record.spesa_ads).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(record.id!)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {record.amazon_products && record.amazon_products.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="font-medium mb-2 text-gray-700">Prodotti Venduti:</h4>
-                      <div className="rounded-md border overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-gray-50">
-                              <TableHead>Prodotto</TableHead>
-                              <TableHead className="text-right">Quantità</TableHead>
-                              <TableHead className="text-right">Fatturato Prodotto</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {record.amazon_products.map((product) => (
-                              <TableRow key={product.id}>
-                                <TableCell className="font-medium">{product.nome}</TableCell>
-                                <TableCell className="text-right">{product.quantita}</TableCell>
-                                <TableCell className="text-right">
-                                  {product.fatturato_prodotto ? `€${product.fatturato_prodotto.toFixed(2)}` : '-'}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                      </TableCell>
+                      <TableCell className="text-right">€{record.fatturato.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">€{record.spesa_ads.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge 
+                          variant={record.roi >= 0 ? "default" : "destructive"}
+                          className={record.roi >= 0 ? "bg-green-100 text-green-800" : ""}
+                        >
+                          {record.roi.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-medium ${(record.fatturato - record.spesa_ads) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          €{(record.fatturato - record.spesa_ads).toLocaleString()}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(record.id!)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

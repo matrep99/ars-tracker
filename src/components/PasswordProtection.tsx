@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,29 +7,18 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 interface PasswordProtectionProps {
-  children: React.ReactNode;
   onAuthenticated: () => void;
 }
 
-export const PasswordProtection = ({ children, onAuthenticated }: PasswordProtectionProps) => {
+export const PasswordProtection = ({ onAuthenticated }: PasswordProtectionProps) => {
   const [password, setPassword] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const storedAuth = localStorage.getItem('app_authenticated');
-    if (storedAuth === 'true') {
-      setIsAuthenticated(true);
-      onAuthenticated();
-    }
-  }, [onAuthenticated]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (password === 'arsads') {
       localStorage.setItem('app_authenticated', 'true');
-      setIsAuthenticated(true);
       onAuthenticated();
     } else {
       toast({
@@ -39,10 +28,6 @@ export const PasswordProtection = ({ children, onAuthenticated }: PasswordProtec
       });
     }
   };
-
-  if (isAuthenticated) {
-    return <>{children}</>;
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
