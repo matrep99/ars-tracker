@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CampaignData {
@@ -147,7 +148,10 @@ export const getCampaignsByDateRange = async (
   
   const { data: campaigns, error: campaignsError } = await supabase
     .from('campaigns')
-    .select('*')
+    .select(`
+      *,
+      campaign_products (*)
+    `)
     .gte('data', startDate)
     .lte('data', endDate)
     .order('data', { ascending: false });
@@ -157,23 +161,6 @@ export const getCampaignsByDateRange = async (
     throw campaignsError;
   }
 
-  // Fetch products for each campaign
-  const campaignsWithProducts = await Promise.all(
-    campaigns.map(async (campaign) => {
-      const { data: products, error: productsError } = await supabase
-        .from('campaign_products')
-        .select('*')
-        .eq('campaign_id', campaign.id);
-
-      if (productsError) {
-        console.error(`Error fetching products for campaign ${campaign.id}:`, productsError);
-        return { ...campaign, products: [] };
-      }
-
-      return { ...campaign, products: products || [] };
-    })
-  );
-
-  console.log('Campaigns by date range fetched:', campaignsWithProducts);
-  return campaignsWithProducts;
+  console.log('Campaigns by date range fetched:', campaigns);
+  return campaigns || [];
 };

@@ -12,7 +12,9 @@ import { ProductLeaderboard } from '@/components/ProductLeaderboard';
 import { PasswordProtection } from '@/components/PasswordProtection';
 import { AmazonRevenue } from '@/components/AmazonRevenue';
 import { MarginCalculator } from '@/components/MarginCalculator';
+import { EnhancedMarginCalculator } from '@/components/EnhancedMarginCalculator';
 import { CampaignEditDialog } from '@/components/CampaignEditDialog';
+import { DateFilter } from '@/components/DateFilter';
 import { Plus, TrendingUp, Euro, ShoppingCart, Package, Trash2, Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +29,12 @@ import {
   CampaignWithProducts 
 } from '@/lib/supabaseService';
 import { getAllAmazonRevenue, getAmazonRevenueByDateRange } from '@/lib/amazonRevenueService';
+
+export interface DateRange {
+  startDate: string;
+  endDate: string;
+  type: 'all' | 'month' | 'custom';
+}
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
