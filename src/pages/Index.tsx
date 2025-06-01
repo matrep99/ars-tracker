@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import {
   Card,
@@ -46,7 +45,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { DateFilter } from '@/components/DateFilter';
+import { DateFilter, DateRange } from '@/components/DateFilter';
 import { CampaignEditDialog } from '@/components/CampaignEditDialog';
 import { PerformanceCharts } from '@/components/PerformanceCharts';
 import { CampaignCharts } from '@/components/CampaignCharts';
@@ -68,8 +67,8 @@ const Index = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<CampaignWithProducts | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: null,
-    endDate: null,
+    startDate: '',
+    endDate: '',
     type: 'all',
   });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -332,12 +331,8 @@ const Index = () => {
     setDateRange(range);
   };
 
-  const handleAuthenticationChange = (authenticated: boolean) => {
-    setIsAuthenticated(authenticated);
-  };
-
   return (
-    <PasswordProtection onAuthenticated={handleAuthenticationChange}>
+    <PasswordProtection onAuthenticated={() => setIsAuthenticated(true)}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
@@ -347,7 +342,7 @@ const Index = () => {
                 <h1 className="text-3xl font-bold text-gray-900">Dashboard Marketing</h1>
                 <p className="text-gray-600 mt-1">Monitora e analizza i dati in tempo reale</p>
               </div>
-              <DateFilter onDateRangeChange={handleDateRangeChange} />
+              <DateFilter onDateRangeChange={handleDateRangeChange} currentRange={dateRange} />
             </div>
           </div>
         </div>
