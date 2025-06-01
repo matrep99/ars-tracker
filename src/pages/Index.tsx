@@ -1,138 +1,106 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { useToast } from '@/hooks/use-toast';
-import { CampaignCharts } from '@/components/CampaignCharts';
-import { ProductLeaderboard } from '@/components/ProductLeaderboard';
-import { PasswordProtection } from '@/components/PasswordProtection';
-import { AmazonRevenue } from '@/components/AmazonRevenue';
-import { MarginCalculator } from '@/components/MarginCalculator';
-import { EnhancedMarginCalculator } from '@/components/EnhancedMarginCalculator';
-import { CampaignEditDialog } from '@/components/CampaignEditDialog';
-import { DateFilter } from '@/components/DateFilter';
-import { Plus, TrendingUp, Euro, ShoppingCart, Package, Trash2, Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  TrendingUp,
+  ShoppingCart,
+  Package,
+  Euro,
+  Plus,
+  Trash2,
+  Edit,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { 
-  saveCampaignToSupabase, 
-  getAllCampaignsFromSupabase, 
+import {
+  getAllCampaignsFromSupabase,
+  saveCampaignToSupabase,
   deleteCampaignFromSupabase,
-  getCampaignById,
-  getCampaignsByDateRange,
-  CampaignWithProducts 
+  CampaignData,
+  CampaignWithProducts,
 } from '@/lib/supabaseService';
-import { getAllAmazonRevenue, getAmazonRevenueByDateRange } from '@/lib/amazonRevenueService';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { DateFilter } from '@/components/DateFilter';
+import { CampaignEditDialog } from '@/components/CampaignEditDialog';
+import { PerformanceCharts } from '@/components/PerformanceCharts';
+import { CampaignCharts } from '@/components/CampaignCharts';
+import { ProductLeaderboard } from '@/components/ProductLeaderboard';
+import { DataSharing } from '@/components/DataSharing';
+import { PasswordProtection } from '@/components/PasswordProtection';
+import { AmazonRevenue } from '@/components/AmazonRevenue';
+import { IntegratedMarginCalculator } from '@/components/IntegratedMarginCalculator';
 
-export interface DateRange {
-  startDate: string;
-  endDate: string;
-  type: 'all' | 'month' | 'custom';
+interface DateRange {
+  startDate: string | null;
+  endDate: string | null;
+  type: 'all' | 'custom';
 }
 
 const Index = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [campaigns, setCampaigns] = useState<CampaignWithProducts[]>([]);
-  const [sharedCampaign, setSharedCampaign] = useState<CampaignWithProducts | null>(null);
-  const [isReadOnly, setIsReadOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<CampaignWithProducts | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: null,
+    endDate: null,
+    type: 'all',
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [formData, setFormData] = useState<Omit<CampaignData, 'id' | 'created_at' | 'updated_at'>>({
     titolo: '',
     descrizione: '',
-    budget: '',
-    fatturato: '',
-    ordini: '',
-    prodotti: '',
-    data: new Date().toISOString().split('T')[0]
+    budget: 0,
+    fatturato: 0,
+    ordini: 0,
+    prodotti: 0,
+    data: new Date().toISOString().slice(0, 10),
+    roi: 0,
+    valore_medio_ordine: 0,
+    prodotti_medi_per_ordine: 0,
   });
-  const [productInput, setProductInput] = useState({ nome: '', quantita: '' });
-  const [productList, setProductList] = useState<{ nome: string; quantita: number }[]>([]);
-  const [editingCampaign, setEditingCampaign] = useState<CampaignWithProducts | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: '',
-    endDate: '',
-    type: 'all'
-  });
-  const [amazonData, setAmazonData] = useState([]);
+  const [productForm, setProductForm] = useState({ nome: '', quantita: '' });
+  const [campaignProducts, setCampaignProducts] = useState<{ nome: string; quantita: number }[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check for shared campaign in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedId = urlParams.get('id');
-    
-    if (sharedId) {
-      setIsReadOnly(true);
-      loadSharedCampaign(sharedId);
-      return;
-    }
-
-    // Check authentication
-    const isAuth = localStorage.getItem('app_authenticated') === 'true';
-    if (isAuth) {
-      setIsAuthenticated(true);
-      loadCampaigns();
-      loadAmazonData();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated && !isReadOnly) {
-      loadCampaigns();
-      loadAmazonData();
-    }
+    loadCampaigns();
   }, [dateRange]);
-
-  const loadSharedCampaign = async (campaignId: string) => {
-    try {
-      setIsLoading(true);
-      const campaign = await getCampaignById(campaignId);
-      if (campaign) {
-        setSharedCampaign(campaign);
-        setIsAuthenticated(true);
-      } else {
-        toast({
-          title: "Campagna non trovata",
-          description: "La campagna richiesta non esiste o è stata eliminata",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Error loading shared campaign:', error);
-      toast({
-        title: "Errore nel caricamento",
-        description: "Impossibile caricare la campagna condivisa",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loadCampaigns = async () => {
     try {
       setIsLoading(true);
-      let allCampaigns: CampaignWithProducts[];
-      
-      if (dateRange.type !== 'all' && dateRange.startDate && dateRange.endDate) {
-        allCampaigns = await getCampaignsByDateRange(dateRange.startDate, dateRange.endDate);
-      } else {
-        allCampaigns = await getAllCampaignsFromSupabase();
-      }
-      
-      setCampaigns(allCampaigns);
+      const campaignsData = await getAllCampaignsFromSupabase();
+      setCampaigns(campaignsData);
     } catch (error) {
       console.error('Error loading campaigns:', error);
       toast({
         title: "Errore nel caricamento",
-        description: "Impossibile caricare le campagne salvate",
+        description: "Impossibile caricare le campagne",
         variant: "destructive"
       });
     } finally {
@@ -140,277 +108,470 @@ const Index = () => {
     }
   };
 
-  const loadAmazonData = async () => {
-    try {
-      let data;
-      if (dateRange.type !== 'all' && dateRange.startDate && dateRange.endDate) {
-        data = await getAmazonRevenueByDateRange(dateRange.startDate, dateRange.endDate);
-      } else {
-        data = await getAllAmazonRevenue();
-      }
-      setAmazonData(data);
-    } catch (error) {
-      console.error('Error loading Amazon data:', error);
-    }
-  };
-
-  const addProduct = () => {
-    if (productInput.nome && productInput.quantita) {
-      const newProduct = {
-        nome: productInput.nome,
-        quantita: parseInt(productInput.quantita)
-      };
-      setProductList([...productList, newProduct]);
-      setProductInput({ nome: '', quantita: '' });
-    }
-  };
-
-  const removeProduct = (index: number) => {
-    setProductList(productList.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const spesa_ads = parseFloat(formData.budget); // Still using budget field name for DB
-    const fatturato = parseFloat(formData.fatturato);
-    const ordini = parseInt(formData.ordini);
-    const prodotti = parseInt(formData.prodotti);
 
-    if (spesa_ads < 0 || fatturato < 0 || ordini < 0 || prodotti < 0) {
+    // Validate form data
+    if (!formData.titolo || !formData.data || formData.budget <= 0 || formData.fatturato <= 0 || formData.ordini <= 0 || formData.prodotti <= 0) {
       toast({
-        title: "Valori non validi",
-        description: "Tutti i valori devono essere numeri positivi",
-        variant: "destructive"
+        title: "Errore",
+        description: "Per favore, compila tutti i campi correttamente.",
+        variant: "destructive",
       });
       return;
     }
 
-    const roi = spesa_ads > 0 ? ((fatturato - spesa_ads) / spesa_ads) * 100 : 0;
-    const valoreMedioOrdine = ordini > 0 ? fatturato / ordini : 0;
-    const prodottiMediPerOrdine = ordini > 0 ? prodotti / ordini : 0;
-
-    const campaignData = {
-      titolo: formData.titolo || `Campagna ${campaigns.length + 1}`,
-      descrizione: formData.descrizione,
-      budget: spesa_ads, // Still saving as budget in DB
-      fatturato,
-      ordini,
-      prodotti,
-      data: formData.data,
-      roi,
-      valore_medio_ordine: valoreMedioOrdine,
-      prodotti_medi_per_ordine: prodottiMediPerOrdine
-    };
+    // Calculate derived fields
+    const valore_medio_ordine = formData.ordini > 0 ? formData.fatturato / formData.ordini : 0;
+    const prodotti_medi_per_ordine = formData.ordini > 0 ? formData.prodotti / formData.ordini : 0;
+    const roi = formData.budget > 0 ? ((formData.fatturato - formData.budget) / formData.budget) * 100 : 0;
 
     try {
       setIsLoading(true);
-      await saveCampaignToSupabase(campaignData, productList);
+      const campaignData: Omit<CampaignData, 'id' | 'created_at' | 'updated_at'> = {
+        ...formData,
+        valore_medio_ordine,
+        prodotti_medi_per_ordine,
+        roi,
+      };
+      await saveCampaignToSupabase(campaignData, campaignProducts);
       await loadCampaigns();
-      
-      // Reset form
       setFormData({
         titolo: '',
         descrizione: '',
-        budget: '',
-        fatturato: '',
-        ordini: '',
-        prodotti: '',
-        data: new Date().toISOString().split('T')[0]
+        budget: 0,
+        fatturato: 0,
+        ordini: 0,
+        prodotti: 0,
+        data: new Date().toISOString().slice(0, 10),
+        roi: 0,
+        valore_medio_ordine: 0,
+        prodotti_medi_per_ordine: 0,
       });
-      setProductList([]);
-      
+      setCampaignProducts([]);
+      setProductForm({ nome: '', quantita: '' });
       toast({
         title: "Campagna salvata",
-        description: `La campagna "${campaignData.titolo}" è stata salvata con successo`
+        description: "La campagna è stata salvata con successo.",
       });
     } catch (error) {
       console.error('Error saving campaign:', error);
       toast({
         title: "Errore nel salvataggio",
-        description: "Impossibile salvare la campagna",
-        variant: "destructive"
+        description: "Impossibile salvare la campagna.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeleteCampaign = async (id: string) => {
+  const handleDeleteCampaign = async (campaignId: string) => {
     try {
       setIsLoading(true);
-      await deleteCampaignFromSupabase(id);
+      await deleteCampaignFromSupabase(campaignId);
       await loadCampaigns();
       toast({
         title: "Campagna eliminata",
-        description: "La campagna è stata rimossa con successo"
+        description: "La campagna è stata eliminata con successo.",
       });
     } catch (error) {
       console.error('Error deleting campaign:', error);
       toast({
         title: "Errore nell'eliminazione",
-        description: "Impossibile eliminare la campagna",
-        variant: "destructive"
+        description: "Impossibile eliminare la campagna.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const generateShareLink = (campaignId: string) => {
-    const shareUrl = `${window.location.origin}?id=${campaignId}`;
-    navigator.clipboard.writeText(shareUrl).then(() => {
+  const handleEditCampaign = async (updatedCampaign: CampaignWithProducts) => {
+    try {
+      setIsLoading(true);
+      // Prepare the data for update
+      const { id, created_at, updated_at, campaign_products, ...campaignData } = updatedCampaign;
+
+      // Calculate derived fields
+      const valore_medio_ordine = campaignData.ordini > 0 ? campaignData.fatturato / campaignData.ordini : 0;
+      const prodotti_medi_per_ordine = campaignData.ordini > 0 ? campaignData.prodotti / campaignData.ordini : 0;
+      const roi = campaignData.budget > 0 ? ((campaignData.fatturato - campaignData.budget) / campaignData.budget) * 100 : 0;
+
+      const updatedData: CampaignData = {
+        ...campaignData,
+        valore_medio_ordine,
+        prodotti_medi_per_ordine,
+        roi,
+      };
+
+      // Update the campaign in Supabase
+      const { error } = await supabase
+        .from('campaigns')
+        .update(updatedData)
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating campaign:', error);
+        toast({
+          title: "Errore nell'aggiornamento",
+          description: "Impossibile aggiornare la campagna.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update products (assuming you want to replace existing products with new ones)
+      // First, delete existing products
+      const { error: deleteError } = await supabase
+        .from('campaign_products')
+        .delete()
+        .eq('campaign_id', id);
+
+      if (deleteError) {
+        console.error('Error deleting existing products:', deleteError);
+        toast({
+          title: "Errore nell'aggiornamento prodotti",
+          description: "Impossibile aggiornare i prodotti della campagna.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Then, insert new products
+      if (campaign_products && campaign_products.length > 0) {
+        const productsToInsert = campaign_products.map(product => ({
+          campaign_id: id,
+          nome: product.nome,
+          quantita: product.quantita
+        }));
+
+        const { error: insertError } = await supabase
+          .from('campaign_products')
+          .insert(productsToInsert);
+
+        if (insertError) {
+          console.error('Error inserting new products:', insertError);
+          toast({
+            title: "Errore nell'inserimento prodotti",
+            description: "Impossibile inserire i nuovi prodotti della campagna.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Reload campaigns to reflect the changes
+      await loadCampaigns();
+      setIsEditDialogOpen(false);
       toast({
-        title: "Link copiato",
-        description: "Il link di condivisione è stato copiato negli appunti"
+        title: "Campagna aggiornata",
+        description: "La campagna è stata aggiornata con successo.",
       });
-    });
-  };
-
-  const handleEditCampaign = (campaign: CampaignWithProducts) => {
-    setEditingCampaign(campaign);
-    setEditDialogOpen(true);
-  };
-
-  const handleSaveEdit = async () => {
-    await loadCampaigns();
-  };
-
-  if (!isAuthenticated) {
-    if (isLoading) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Caricamento in corso...</p>
-          </div>
-        </div>
-      );
+    } catch (error) {
+      console.error('Error editing campaign:', error);
+      toast({
+        title: "Errore nella modifica",
+        description: "Impossibile modificare la campagna.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-    return <PasswordProtection onAuthenticated={() => setIsAuthenticated(true)} />;
-  }
+  };
 
-  const displayCampaigns = sharedCampaign ? [sharedCampaign] : campaigns;
-  const totalSpesaAds = displayCampaigns.reduce((sum, campaign) => sum + campaign.budget, 0);
-  const totalFatturato = displayCampaigns.reduce((sum, campaign) => sum + campaign.fatturato, 0);
-  const totalOrdini = displayCampaigns.reduce((sum, campaign) => sum + campaign.ordini, 0);
-  const overallROI = totalSpesaAds > 0 ? ((totalFatturato - totalSpesaAds) / totalSpesaAds) * 100 : 0;
-  const avgValoreMedioOrdine = totalOrdini > 0 ? totalFatturato / totalOrdini : 0;
+  const addProductToCampaign = () => {
+    if (productForm.nome && productForm.quantita) {
+      setCampaignProducts([...campaignProducts, { nome: productForm.nome, quantita: parseInt(productForm.quantita) }]);
+      setProductForm({ nome: '', quantita: '' });
+    }
+  };
 
-  // Amazon totals for margin calculator
-  const totalAmazonSpend = amazonData.reduce((sum, record) => sum + (record.spesa_ads || 0), 0);
+  const removeProductFromCampaign = (index: number) => {
+    const newProducts = [...campaignProducts];
+    newProducts.splice(index, 1);
+    setCampaignProducts(newProducts);
+  };
+
+  const openEditDialog = (campaign: CampaignWithProducts) => {
+    setEditingCampaign(campaign);
+    setIsEditDialogOpen(true);
+  };
+
+  // Calculate totals for summary cards
+  const totalBudget = campaigns.reduce((sum, campaign) => sum + campaign.budget, 0);
+  const totalRevenue = campaigns.reduce((sum, campaign) => sum + campaign.fatturato, 0);
+  const totalOrders = campaigns.reduce((sum, campaign) => sum + campaign.ordini, 0);
+  const averageROI = campaigns.length > 0
+    ? campaigns.reduce((sum, campaign) => sum + campaign.roi, 0) / campaigns.length
+    : 0;
+
+  // Calculate Amazon total spend
+  const amazonTotalSpend = 0;
+
+  // Filter campaigns based on date range
+  const filteredCampaigns = campaigns.filter(campaign => {
+    if (dateRange.type === 'all') {
+      return true;
+    }
+
+    if (!dateRange.startDate || !dateRange.endDate) {
+      return true; // or show a message that date range is not valid
+    }
+
+    const campaignDate = new Date(campaign.data);
+    const startDate = new Date(dateRange.startDate);
+    const endDate = new Date(dateRange.endDate);
+
+    return campaignDate >= startDate && campaignDate <= endDate;
+  });
 
   return (
-    <TooltipProvider>
+    <PasswordProtection onAuthenticated={setIsAuthenticated}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="container mx-auto p-6">
-          <div className="mb-8">
-            <div className="flex items-center gap-4 mb-4">
-              <img 
-                src="/lovable-uploads/17d902f5-0c8c-426b-aebc-ce1adba3d45d.png" 
-                alt="ARS Logo" 
-                className="h-12 w-auto"
-              />
+        {/* Header */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900">
-                  ARS Tracker {isReadOnly && "(Solo Lettura)"}
-                </h1>
-                <p className="text-lg text-gray-600">
-                  Monitora e analizza i dati in tempo reale
-                </p>
+                <h1 className="text-3xl font-bold text-gray-900">Dashboard Marketing</h1>
+                <p className="text-gray-600 mt-1">Monitora e analizza i dati in tempo reale</p>
               </div>
+              <DateFilter onDateRangeChange={setDateRange} />
             </div>
           </div>
+        </div>
 
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Caricamento...</span>
-              </div>
-            </div>
-          )}
-
-          {/* Date Filter */}
-          {!isReadOnly && (
-            <div className="mb-6">
-              <DateFilter
-                onDateRangeChange={setDateRange}
-                currentRange={dateRange}
-              />
-            </div>
-          )}
-
-          {/* Summary Cards - Updated labels */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Spesa Ads Totale</CardTitle>
-                <Euro className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">€{totalSpesaAds.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Fatturato Totale</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">€{totalFatturato.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">ROI Complessivo</CardTitle>
-                <TrendingUp className="h-4 w-4 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${overallROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {overallROI.toFixed(1)}%
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Valore Medio Ordine</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">€{avgValoreMedioOrdine.toFixed(2)}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Tabs defaultValue="campaigns" className="space-y-8">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="campaigns">Campagne</TabsTrigger>
-              <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
               <TabsTrigger value="amazon">Amazon</TabsTrigger>
               <TabsTrigger value="margin">Calcolatore Margini</TabsTrigger>
-              {!isReadOnly && <TabsTrigger value="add">Aggiungi</TabsTrigger>}
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="dashboard" className="space-y-6">
-              <CampaignCharts campaigns={displayCampaigns} />
-            </TabsContent>
+            <TabsContent value="campaigns" className="space-y-8">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">Spesa Ads Totale</CardTitle>
+                    <Euro className="h-4 w-4 text-blue-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-gray-900">€{totalBudget.toLocaleString()}</div>
+                    <p className="text-xs text-gray-500 mt-1">Investimento pubblicitario</p>
+                  </CardContent>
+                </Card>
 
-            <TabsContent value="campaigns" className="space-y-6">
+                <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">Fatturato Totale</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-gray-900">€{totalRevenue.toLocaleString()}</div>
+                    <p className="text-xs text-gray-500 mt-1">Ricavi generati</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">Ordini Totali</CardTitle>
+                    <ShoppingCart className="h-4 w-4 text-purple-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-gray-900">{totalOrders.toLocaleString()}</div>
+                    <p className="text-xs text-gray-500 mt-1">Conversioni totali</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">ROI Medio</CardTitle>
+                    <Package className="h-4 w-4 text-orange-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${averageROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {averageROI.toFixed(1)}%
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Return on Investment</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Add Campaign Form */}
               <Card className="bg-white shadow-lg">
                 <CardHeader>
-                  <CardTitle>Tutte le Campagne</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Plus className="h-5 w-5" />
+                    Aggiungi Nuova Campagna
+                  </CardTitle>
+                  <CardDescription>Inserisci i dettagli della tua campagna pubblicitaria</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="titolo">Titolo Campagna</Label>
+                        <Input
+                          id="titolo"
+                          value={formData.titolo}
+                          onChange={(e) => setFormData(prev => ({ ...prev, titolo: e.target.value }))}
+                          placeholder="es. Campagna Black Friday"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="data">Data</Label>
+                        <Input
+                          id="data"
+                          type="date"
+                          value={formData.data}
+                          onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="budget">Spesa Ads (€)</Label>
+                        <Input
+                          id="budget"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.budget}
+                          onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                          placeholder="1000.00"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fatturato">Fatturato (€)</Label>
+                        <Input
+                          id="fatturato"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.fatturato}
+                          onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
+                          placeholder="3000.00"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ordini">Numero Ordini</Label>
+                        <Input
+                          id="ordini"
+                          type="number"
+                          min="1"
+                          value={formData.ordini}
+                          onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
+                          placeholder="15"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="prodotti">Prodotti Venduti</Label>
+                        <Input
+                          id="prodotti"
+                          type="number"
+                          min="1"
+                          value={formData.prodotti}
+                          onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
+                          placeholder="45"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="descrizione">Descrizione (opzionale)</Label>
+                      <Input
+                        id="descrizione"
+                        value={formData.descrizione}
+                        onChange={(e) => setFormData(prev => ({ ...prev, descrizione: e.target.value }))}
+                        placeholder="Breve descrizione della campagna"
+                      />
+                    </div>
+
+                    {/* Product Input Section */}
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <h4 className="font-medium mb-3">Prodotti Venduti</h4>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="product-name">Nome Prodotto</Label>
+                            <Input
+                              id="product-name"
+                              value={productForm.nome}
+                              onChange={(e) => setProductForm(prev => ({ ...prev, nome: e.target.value }))}
+                              placeholder="es. iPhone 15"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="product-quantity">Quantità</Label>
+                            <Input
+                              id="product-quantity"
+                              type="number"
+                              min="1"
+                              value={productForm.quantita}
+                              onChange={(e) => setProductForm(prev => ({ ...prev, quantita: e.target.value }))}
+                              placeholder="10"
+                            />
+                          </div>
+                        </div>
+                        <Button 
+                          type="button" 
+                          onClick={addProductToCampaign}
+                          size="sm"
+                          className="w-full md:w-auto"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Aggiungi Prodotto
+                        </Button>
+                      </div>
+
+                      {campaignProducts.length > 0 && (
+                        <div className="mt-4">
+                          <h5 className="font-medium mb-2">Prodotti aggiunti:</h5>
+                          <div className="space-y-2">
+                            {campaignProducts.map((product, index) => (
+                              <div key={index} className="flex justify-between items-center bg-white p-2 rounded border">
+                                <span>{product.nome} - Qtà: {product.quantita}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeProductFromCampaign(index)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {/* Campaigns Table */}
+              <Card className="bg-white shadow-lg">
+                <CardHeader>
+                  <CardTitle>Campagne Recenti</CardTitle>
                   <CardDescription>Visualizza e gestisci le tue campagne pubblicitarie</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {displayCampaigns.length === 0 ? (
+                  {filteredCampaigns.length === 0 ? (
                     <div className="text-center py-8">
-                      <p className="text-gray-500">Nessuna campagna trovata. Aggiungi la tua prima campagna per iniziare!</p>
+                      <p className="text-gray-500">Nessuna campagna trovata. Aggiungi la prima campagna per iniziare!</p>
                     </div>
                   ) : (
                     <div className="rounded-md border overflow-hidden">
@@ -423,15 +584,22 @@ const Index = () => {
                             <TableHead className="text-right">Fatturato</TableHead>
                             <TableHead className="text-right">Ordini</TableHead>
                             <TableHead className="text-right">ROI</TableHead>
-                            <TableHead className="text-right">Val. Medio Ordine</TableHead>
+                            <TableHead className="text-right">VMO</TableHead>
                             <TableHead className="w-[100px]">Azioni</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {displayCampaigns.map((campaign) => (
+                          {filteredCampaigns.map((campaign) => (
                             <TableRow key={campaign.id} className="hover:bg-gray-50">
-                              <TableCell className="font-medium">{campaign.titolo}</TableCell>
-                              <TableCell>{format(new Date(campaign.data), 'dd MMM yyyy', { locale: it })}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{campaign.titolo}</div>
+                                  {campaign.descrizione && (
+                                    <div className="text-sm text-gray-500">{campaign.descrizione}</div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{format(new Date(campaign.data), 'dd/MM/yyyy')}</TableCell>
                               <TableCell className="text-right">€{campaign.budget.toLocaleString()}</TableCell>
                               <TableCell className="text-right">€{campaign.fatturato.toLocaleString()}</TableCell>
                               <TableCell className="text-right">{campaign.ordini}</TableCell>
@@ -445,35 +613,23 @@ const Index = () => {
                               </TableCell>
                               <TableCell className="text-right">€{campaign.valore_medio_ordine.toFixed(2)}</TableCell>
                               <TableCell>
-                                <div className="flex gap-1">
+                                <div className="flex gap-2">
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleEditCampaign(campaign)}
+                                    onClick={() => openEditDialog(campaign)}
                                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    title="Modifica campagna"
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => generateShareLink(campaign.id!)}
-                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    title="Condividi campagna"
+                                    onClick={() => handleDeleteCampaign(campaign.id!)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                   >
-                                    📤
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
-                                  {!isReadOnly && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteCampaign(campaign.id!)}
-                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -486,180 +642,37 @@ const Index = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="products" className="space-y-6">
-              <ProductLeaderboard campaigns={displayCampaigns} />
-            </TabsContent>
-
-            <TabsContent value="amazon" className="space-y-6">
+            <TabsContent value="amazon" className="space-y-8">
               <AmazonRevenue dateRange={dateRange} />
             </TabsContent>
 
-            <TabsContent value="margin" className="space-y-6">
-              <EnhancedMarginCalculator 
-                totalCampaignSpend={totalSpesaAds}
-                totalAmazonSpend={totalAmazonSpend}
+            <TabsContent value="margin" className="space-y-8">
+              <IntegratedMarginCalculator 
+                totalCampaignSpend={totalBudget}
+                totalAmazonSpend={amazonTotalSpend}
+                dateRange={dateRange}
               />
             </TabsContent>
 
-            {!isReadOnly && (
-              <TabsContent value="add" className="space-y-6">
-                <Card className="bg-white shadow-lg max-w-4xl mx-auto">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Plus className="h-5 w-5" />
-                      Aggiungi Nuova Campagna
-                    </CardTitle>
-                    <CardDescription>Inserisci i dati della tua campagna pubblicitaria</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="titolo">Titolo Campagna</Label>
-                          <Input
-                            id="titolo"
-                            placeholder="es. Campagna Facebook Natale"
-                            value={formData.titolo}
-                            onChange={(e) => setFormData(prev => ({ ...prev, titolo: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="data">Data</Label>
-                          <Input
-                            id="data"
-                            type="date"
-                            value={formData.data}
-                            onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="descrizione">Descrizione della Campagna</Label>
-                        <Textarea
-                          id="descrizione"
-                          placeholder="Descrivi la tua campagna pubblicitaria..."
-                          value={formData.descrizione}
-                          onChange={(e) => setFormData(prev => ({ ...prev, descrizione: e.target.value }))}
-                          rows={3}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="budget">Spesa Ads (€)</Label>
-                          <Input
-                            id="budget"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="1000.00"
-                            value={formData.budget}
-                            onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="fatturato">Fatturato Generato (€)</Label>
-                          <Input
-                            id="fatturato"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="1500.00"
-                            value={formData.fatturato}
-                            onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ordini">Numero di Ordini</Label>
-                          <Input
-                            id="ordini"
-                            type="number"
-                            min="0"
-                            placeholder="25"
-                            value={formData.ordini}
-                            onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="prodotti">Prodotti Venduti</Label>
-                          <Input
-                            id="prodotti"
-                            type="number"
-                            min="0"
-                            placeholder="50"
-                            value={formData.prodotti}
-                            onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <Label>Prodotti Più Venduti</Label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          <Input
-                            placeholder="Nome prodotto"
-                            value={productInput.nome}
-                            onChange={(e) => setProductInput(prev => ({ ...prev, nome: e.target.value }))}
-                          />
-                          <Input
-                            type="number"
-                            placeholder="Quantità"
-                            value={productInput.quantita}
-                            onChange={(e) => setProductInput(prev => ({ ...prev, quantita: e.target.value }))}
-                          />
-                          <Button type="button" onClick={addProduct}>
-                            Aggiungi Prodotto
-                          </Button>
-                        </div>
-
-                        {productList.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="font-medium">Prodotti aggiunti:</h4>
-                            <div className="space-y-1">
-                              {productList.map((product, index) => (
-                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                  <span>{product.nome} - Qtà: {product.quantita}</span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeProduct(index)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
-                        {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
+            <TabsContent value="analytics" className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <PerformanceCharts campaigns={filteredCampaigns} />
+                <CampaignCharts campaigns={filteredCampaigns} />
+              </div>
+              <ProductLeaderboard campaigns={filteredCampaigns} />
+              <DataSharing campaigns={filteredCampaigns} />
+            </TabsContent>
           </Tabs>
         </div>
 
-        <CampaignEditDialog
+        <CampaignEditDialog 
           campaign={editingCampaign}
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
-          onSave={handleSaveEdit}
+          isOpen={isEditDialogOpen}
+          onClose={() => setIsEditDialogOpen(false)}
+          onSave={handleEditCampaign}
         />
       </div>
-    </TooltipProvider>
+    </PasswordProtection>
   );
 };
 

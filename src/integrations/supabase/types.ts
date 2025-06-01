@@ -9,6 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      amazon_products: {
+        Row: {
+          amazon_revenue_id: string
+          created_at: string
+          fatturato_prodotto: number | null
+          id: string
+          nome: string
+          quantita: number
+        }
+        Insert: {
+          amazon_revenue_id: string
+          created_at?: string
+          fatturato_prodotto?: number | null
+          id?: string
+          nome: string
+          quantita?: number
+        }
+        Update: {
+          amazon_revenue_id?: string
+          created_at?: string
+          fatturato_prodotto?: number | null
+          id?: string
+          nome?: string
+          quantita?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amazon_products_amazon_revenue_id_fkey"
+            columns: ["amazon_revenue_id"]
+            isOneToOne: false
+            referencedRelation: "amazon_revenue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       amazon_revenue: {
         Row: {
           created_at: string
