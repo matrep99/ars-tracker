@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import {
   Card,
@@ -54,12 +55,6 @@ import { DataSharing } from '@/components/DataSharing';
 import { PasswordProtection } from '@/components/PasswordProtection';
 import { AmazonRevenue } from '@/components/AmazonRevenue';
 import { IntegratedMarginCalculator } from '@/components/IntegratedMarginCalculator';
-
-interface DateRange {
-  startDate: string | null;
-  endDate: string | null;
-  type: 'all' | 'custom';
-}
 
 const Index = () => {
   const [campaigns, setCampaigns] = useState<CampaignWithProducts[]>([]);
