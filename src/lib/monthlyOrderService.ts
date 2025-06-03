@@ -100,44 +100,74 @@ export const deleteMonthlyOrder = async (id: string): Promise<void> => {
   console.log('Monthly order deleted successfully');
 };
 
-// Parse CSV content
+// Improved CSV parser with better error handling
 export const parseCSVContent = (csvContent: string): CSVRow[] => {
-  const lines = csvContent.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  console.log('Parsing CSV content:', csvContent.substring(0, 200) + '...');
   
-  const expectedHeaders = ['prodotto', 'pezzi totali', 'importo totale', 'iva', 'imponibile totale'];
+  const lines = csvContent.trim().split('\n').filter(line => line.trim() !== '');
   
-  // Map CSV headers to our field names
-  const headerMap: { [key: string]: string } = {
-    'prodotto': 'prodotto',
-    'pezzi totali': 'pezzi_totali',
-    'importo totale': 'importo_totale_iva_inclusa',
-    'iva': 'iva',
-    'imponibile totale': 'imponibile_totale'
-  };
+  if (lines.length === 0) {
+    throw new Error('CSV file is empty');
+  }
+  
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+  console.log('CSV Headers found:', headers);
+  
+  // More flexible header mapping
+  const headerMap: { [key: string]: string } = {};
+  
+  headers.forEach((header, index) => {
+    const cleanHeader = header.toLowerCase().trim();
+    if (cleanHeader.includes('prodotto') || cleanHeader.includes('product')) {
+      headerMap['prodotto'] = index.toString();
+    } else if (cleanHeader.includes('pezzi') || cleanHeader.includes('totali') || cleanHeader.includes('quantity')) {
+      headerMap['pezzi_totali'] = index.toString();
+    } else if (cleanHeader.includes('importo') || cleanHeader.includes('totale') && !cleanHeader.includes('imponibile')) {
+      headerMap['importo_totale_iva_inclusa'] = index.toString();
+    } else if (cleanHeader.includes('iva') || cleanHeader.includes('tax')) {
+      headerMap['iva'] = index.toString();
+    } else if (cleanHeader.includes('imponibile') || cleanHeader.includes('net')) {
+      headerMap['imponibile_totale'] = index.toString();
+    }
+  });
+  
+  console.log('Header mapping:', headerMap);
   
   const rows: CSVRow[] = [];
   
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
-    if (values.length !== headers.length) continue;
+    const line = lines[i].trim();
+    if (!line) continue; // Skip empty lines
     
-    const row: any = {};
-    headers.forEach((header, index) => {
-      const fieldName = headerMap[header];
-      if (fieldName) {
-        if (fieldName === 'prodotto') {
-          row[fieldName] = values[index];
-        } else {
-          row[fieldName] = parseFloat(values[index]) || 0;
-        }
+    // Handle CSV values that might contain commas within quotes
+    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    
+    if (values.length < Math.max(...Object.values(headerMap).map(v => parseInt(v))) + 1) {
+      console.warn(`Skipping row ${i} due to insufficient columns:`, values);
+      continue;
+    }
+    
+    try {
+      const row: CSVRow = {
+        prodotto: values[parseInt(headerMap['prodotto'])] || '',
+        pezzi_totali: parseFloat(values[parseInt(headerMap['pezzi_totali'])] || '0') || 0,
+        importo_totale_iva_inclusa: parseFloat(values[parseInt(headerMap['importo_totale_iva_inclusa'])] || '0') || 0,
+        iva: parseFloat(values[parseInt(headerMap['iva'])] || '0') || 0,
+        imponibile_totale: parseFloat(values[parseInt(headerMap['imponibile_totale'])] || '0') || 0
+      };
+      
+      // Only add rows with valid product names
+      if (row.prodotto && row.prodotto.trim() !== '') {
+        rows.push(row);
+        console.log(`Parsed row ${i}:`, row);
+      } else {
+        console.warn(`Skipping row ${i} due to missing product name:`, values);
       }
-    });
-    
-    if (row.prodotto) {
-      rows.push(row as CSVRow);
+    } catch (error) {
+      console.error(`Error parsing row ${i}:`, values, error);
     }
   }
   
+  console.log(`Successfully parsed ${rows.length} rows from ${lines.length - 1} total rows`);
   return rows;
 };

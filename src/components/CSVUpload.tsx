@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, Trash2 } from 'lucide-react';
+import { Upload, FileText, Trash2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseCSVContent, saveMonthlyOrderData, CSVRow } from '@/lib/monthlyOrderService';
 
 interface CSVUploadProps {
@@ -19,6 +20,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
   const [isAmazon, setIsAmazon] = useState(false);
   const [parsedData, setParsedData] = useState<CSVRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [parseErrors, setParseErrors] = useState<string[]>([]);
   const { toast } = useToast();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,10 +40,14 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
     reader.onload = (e) => {
       try {
         const csvContent = e.target?.result as string;
+        console.log('Raw CSV content:', csvContent.substring(0, 500));
+        
+        setParseErrors([]);
         const parsed = parseCSVContent(csvContent);
         setParsedData(parsed);
         
         if (parsed.length === 0) {
+          setParseErrors(['Il file CSV non contiene dati validi o le colonne non sono state riconosciute']);
           toast({
             title: "CSV vuoto",
             description: "Il file CSV non contiene dati validi",
@@ -49,21 +55,24 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
           });
         } else {
           toast({
-            title: "CSV caricato",
-            description: `${parsed.length} righe trovate nel file`
+            title: "CSV caricato con successo",
+            description: `${parsed.length} righe elaborate correttamente`
           });
         }
       } catch (error) {
         console.error('Error parsing CSV:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+        setParseErrors([errorMessage]);
         toast({
           title: "Errore nel parsing",
-          description: "Impossibile analizzare il file CSV",
+          description: errorMessage,
           variant: "destructive"
         });
+        setParsedData([]);
       }
     };
     
-    reader.readAsText(file);
+    reader.readAsText(file, 'UTF-8');
   };
 
   const handleSaveData = async () => {
@@ -91,11 +100,12 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
       await saveMonthlyOrderData(monthlyOrderData);
       
       toast({
-        title: "Dati salvati",
+        title: "Dati salvati con successo",
         description: `${parsedData.length} record salvati per ${selectedMonth}`
       });
       
       setParsedData([]);
+      setParseErrors([]);
       onDataUploaded();
     } catch (error) {
       console.error('Error saving data:', error);
@@ -111,11 +121,13 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
 
   const clearData = () => {
     setParsedData([]);
+    setParseErrors([]);
   };
 
   const totalRevenue = parsedData.reduce((sum, row) => sum + row.importo_totale_iva_inclusa, 0);
   const totalTaxable = parsedData.reduce((sum, row) => sum + row.imponibile_totale, 0);
   const totalUnits = parsedData.reduce((sum, row) => sum + row.pezzi_totali, 0);
+  const totalTax = parsedData.reduce((sum, row) => sum + row.iva, 0);
 
   return (
     <div className="space-y-6">
@@ -126,7 +138,6 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
             Carica Dati Mensili da CSV
           </CardTitle>
           <CardDescription>
-            Carica un file CSV con i dati degli ordini mensili. 
             Colonne richieste: Prodotto, Pezzi totali, Importo totale (€), IVA (€), Imponibile totale (€)
           </CardDescription>
         </CardHeader>
@@ -161,6 +172,19 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
               <Label htmlFor="isAmazon">Dati Amazon</Label>
             </div>
           </div>
+
+          {parseErrors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  {parseErrors.map((error, index) => (
+                    <div key={index}>{error}</div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
@@ -174,9 +198,12 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
                   Anteprima Dati ({parsedData.length} righe)
                 </CardTitle>
                 <CardDescription>
-                  Fatturato totale: €{totalRevenue.toLocaleString()} | 
-                  Imponibile: €{totalTaxable.toLocaleString()} | 
-                  Pezzi totali: {totalUnits.toLocaleString()}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                    <div>Fatturato lordo: €{totalRevenue.toLocaleString()}</div>
+                    <div>Fatturato netto: €{totalTaxable.toLocaleString()}</div>
+                    <div>IVA totale: €{totalTax.toLocaleString()}</div>
+                    <div>Pezzi totali: {totalUnits.toLocaleString()}</div>
+                  </div>
                 </CardDescription>
               </div>
               <div className="flex gap-2">

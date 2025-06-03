@@ -11,8 +11,8 @@ import { CampaignCharts } from '@/components/CampaignCharts';
 import { ProductLeaderboard } from '@/components/ProductLeaderboard';
 import { PasswordProtection } from '@/components/PasswordProtection';
 import { AmazonRevenue } from '@/components/AmazonRevenue';
-import { MarginCalculator } from '@/components/MarginCalculator';
-import { EnhancedMarginCalculator } from '@/components/EnhancedMarginCalculator';
+import { IntegratedMarginManager } from '@/components/IntegratedMarginManager';
+import { SimplifiedDataEntry } from '@/components/SimplifiedDataEntry';
 import { CampaignEditDialog } from '@/components/CampaignEditDialog';
 import { DateFilter } from '@/components/DateFilter';
 import { Plus, TrendingUp, Euro, ShoppingCart, Package, Trash2, Edit } from 'lucide-react';
@@ -30,8 +30,6 @@ import {
 } from '@/lib/supabaseService';
 import { getAllAmazonRevenue, getAmazonRevenueByDateRange } from '@/lib/amazonRevenueService';
 import { getAllMonthlyOrders, getMonthlyOrdersByDateRange } from '@/lib/monthlyOrderService';
-import { CSVUpload } from '@/components/CSVUpload';
-import { ProductCostManager } from '@/components/ProductCostManager';
 
 export interface DateRange {
   startDate: string;
@@ -45,17 +43,6 @@ const Index = () => {
   const [sharedCampaign, setSharedCampaign] = useState<CampaignWithProducts | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    titolo: '',
-    descrizione: '',
-    budget: '',
-    fatturato: '',
-    ordini: '',
-    prodotti: '',
-    data: new Date().toISOString().split('T')[0]
-  });
-  const [productInput, setProductInput] = useState({ nome: '', quantita: '' });
-  const [productList, setProductList] = useState<{ nome: string; quantita: number }[]>([]);
   const [editingCampaign, setEditingCampaign] = useState<CampaignWithProducts | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -174,88 +161,6 @@ const Index = () => {
     }
   };
 
-  const addProduct = () => {
-    if (productInput.nome && productInput.quantita) {
-      const newProduct = {
-        nome: productInput.nome,
-        quantita: parseInt(productInput.quantita)
-      };
-      setProductList([...productList, newProduct]);
-      setProductInput({ nome: '', quantita: '' });
-    }
-  };
-
-  const removeProduct = (index: number) => {
-    setProductList(productList.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const spesa_ads = parseFloat(formData.budget); // Still using budget field name for DB
-    const fatturato = parseFloat(formData.fatturato);
-    const ordini = parseInt(formData.ordini);
-    const prodotti = parseInt(formData.prodotti);
-
-    if (spesa_ads < 0 || fatturato < 0 || ordini < 0 || prodotti < 0) {
-      toast({
-        title: "Valori non validi",
-        description: "Tutti i valori devono essere numeri positivi",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const roi = spesa_ads > 0 ? ((fatturato - spesa_ads) / spesa_ads) * 100 : 0;
-    const valoreMedioOrdine = ordini > 0 ? fatturato / ordini : 0;
-    const prodottiMediPerOrdine = ordini > 0 ? prodotti / ordini : 0;
-
-    const campaignData = {
-      titolo: formData.titolo || `Campagna ${campaigns.length + 1}`,
-      descrizione: formData.descrizione,
-      budget: spesa_ads, // Still saving as budget in DB
-      fatturato,
-      ordini,
-      prodotti,
-      data: formData.data,
-      roi,
-      valore_medio_ordine: valoreMedioOrdine,
-      prodotti_medi_per_ordine: prodottiMediPerOrdine
-    };
-
-    try {
-      setIsLoading(true);
-      await saveCampaignToSupabase(campaignData, productList);
-      await loadCampaigns();
-      
-      // Reset form
-      setFormData({
-        titolo: '',
-        descrizione: '',
-        budget: '',
-        fatturato: '',
-        ordini: '',
-        prodotti: '',
-        data: new Date().toISOString().split('T')[0]
-      });
-      setProductList([]);
-      
-      toast({
-        title: "Campagna salvata",
-        description: `La campagna "${campaignData.titolo}" è stata salvata con successo`
-      });
-    } catch (error) {
-      console.error('Error saving campaign:', error);
-      toast({
-        title: "Errore nel salvataggio",
-        description: "Impossibile salvare la campagna",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleDeleteCampaign = async (id: string) => {
     try {
       setIsLoading(true);
@@ -296,6 +201,12 @@ const Index = () => {
     await loadCampaigns();
   };
 
+  const handleDataRefresh = () => {
+    loadCampaigns();
+    loadAmazonData();
+    loadMonthlyOrders();
+  };
+
   if (!isAuthenticated) {
     if (isLoading) {
       return (
@@ -317,8 +228,8 @@ const Index = () => {
   const overallROI = totalSpesaAds > 0 ? ((totalFatturato - totalSpesaAds) / totalSpesaAds) * 100 : 0;
   const avgValoreMedioOrdine = totalOrdini > 0 ? totalFatturato / totalOrdini : 0;
 
-  // Amazon totals for margin calculator
-  const totalAmazonSpend = amazonData.reduce((sum, record) => sum + (record.spesa_ads || 0), 0);
+  // Calculate net revenue from monthly orders for summary
+  const totalNetRevenue = monthlyOrders.reduce((sum, order) => sum + (order.imponibile_totale || 0), 0);
 
   return (
     <TooltipProvider>
@@ -362,7 +273,7 @@ const Index = () => {
             </div>
           )}
 
-          {/* Summary Cards - Updated labels */}
+          {/* Summary Cards - Updated to show net revenue */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -376,11 +287,12 @@ const Index = () => {
 
             <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Fatturato Totale</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">Fatturato Netto</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">€{totalFatturato.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-gray-900">€{totalNetRevenue.toLocaleString()}</div>
+                <div className="text-xs text-gray-500 mt-1">Imponibile (IVA esclusa)</div>
               </CardContent>
             </Card>
 
@@ -408,14 +320,13 @@ const Index = () => {
           </div>
 
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="campaigns">Campagne</TabsTrigger>
               <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
               <TabsTrigger value="amazon">Amazon</TabsTrigger>
-              <TabsTrigger value="margin">Calcolatore Margini</TabsTrigger>
-              <TabsTrigger value="costs">Costi Prodotti</TabsTrigger>
-              {!isReadOnly && <TabsTrigger value="add">Aggiungi</TabsTrigger>}
+              <TabsTrigger value="margins">Margini & Costi</TabsTrigger>
+              {!isReadOnly && <TabsTrigger value="add">Aggiungi Dati</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6">
@@ -515,169 +426,13 @@ const Index = () => {
               <AmazonRevenue dateRange={dateRange} />
             </TabsContent>
 
-            <TabsContent value="margin" className="space-y-6">
-              <EnhancedMarginCalculator 
-                totalCampaignSpend={totalSpesaAds}
-                totalAmazonSpend={totalAmazonSpend}
-              />
-            </TabsContent>
-
-            <TabsContent value="costs" className="space-y-6">
-              <ProductCostManager />
+            <TabsContent value="margins" className="space-y-6">
+              <IntegratedMarginManager />
             </TabsContent>
 
             {!isReadOnly && (
               <TabsContent value="add" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="bg-white shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Plus className="h-5 w-5" />
-                        Aggiungi Nuova Campagna
-                      </CardTitle>
-                      <CardDescription>Inserisci i dati della tua campagna pubblicitaria</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="titolo">Titolo Campagna</Label>
-                            <Input
-                              id="titolo"
-                              placeholder="es. Campagna Facebook Natale"
-                              value={formData.titolo}
-                              onChange={(e) => setFormData(prev => ({ ...prev, titolo: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="data">Data</Label>
-                            <Input
-                              id="data"
-                              type="date"
-                              value={formData.data}
-                              onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="descrizione">Descrizione della Campagna</Label>
-                          <Textarea
-                            id="descrizione"
-                            placeholder="Descrivi la tua campagna pubblicitaria..."
-                            value={formData.descrizione}
-                            onChange={(e) => setFormData(prev => ({ ...prev, descrizione: e.target.value }))}
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="budget">Spesa Ads (€)</Label>
-                            <Input
-                              id="budget"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="1000.00"
-                              value={formData.budget}
-                              onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="fatturato">Fatturato Generato (€)</Label>
-                            <Input
-                              id="fatturato"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="1500.00"
-                              value={formData.fatturato}
-                              onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ordini">Numero di Ordini</Label>
-                            <Input
-                              id="ordini"
-                              type="number"
-                              min="0"
-                              placeholder="25"
-                              value={formData.ordini}
-                              onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="prodotti">Prodotti Venduti</Label>
-                            <Input
-                              id="prodotti"
-                              type="number"
-                              min="0"
-                              placeholder="50"
-                              value={formData.prodotti}
-                              onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          <Label>Prodotti Più Venduti</Label>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                            <Input
-                              placeholder="Nome prodotto"
-                              value={productInput.nome}
-                              onChange={(e) => setProductInput(prev => ({ ...prev, nome: e.target.value }))}
-                            />
-                            <Input
-                              type="number"
-                              placeholder="Quantità"
-                              value={productInput.quantita}
-                              onChange={(e) => setProductInput(prev => ({ ...prev, quantita: e.target.value }))}
-                            />
-                            <Button type="button" onClick={addProduct}>
-                              Aggiungi Prodotto
-                            </Button>
-                          </div>
-
-                          {productList.length > 0 && (
-                            <div className="space-y-2">
-                              <h4 className="font-medium">Prodotti aggiunti:</h4>
-                              <div className="space-y-1">
-                                {productList.map((product, index) => (
-                                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                    <span>{product.nome} - Qtà: {product.quantita}</span>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeProduct(index)}
-                                      className="text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
-                          {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
-                        </Button>
-                      </form>
-                    </CardContent>
-                  </Card>
-
-                  <div className="space-y-6">
-                    <CSVUpload onDataUploaded={() => { loadMonthlyOrders(); loadAmazonData(); }} />
-                  </div>
-                </div>
+                <SimplifiedDataEntry onDataSaved={handleDataRefresh} />
               </TabsContent>
             )}
           </Tabs>
