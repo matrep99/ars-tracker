@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Plus, Trash2, Edit, Calculator, TrendingUp } from 'lucide-react';
+import { Settings, Plus, Trash2, Edit, Calculator, TrendingUp, Package } from 'lucide-react';
 import { 
   getAllProductCosts, 
   saveProductCosts, 
@@ -22,9 +22,25 @@ interface ProductMarginData extends ProductCostData {
     pezzi_totali: number;
     imponibile_totale: number;
     month: string;
+    total_orders?: number;
   }[];
   total_margin?: number;
   margin_percentage?: number;
+  total_revenue?: number;
+  total_units?: number;
+}
+
+interface MarginReport {
+  month: string;
+  net_revenue: number;
+  product_costs: number;
+  packaging_costs: number;
+  shipping_costs: number;
+  ad_spend: number;
+  total_costs: number;
+  net_margin: number;
+  margin_percentage: number;
+  total_orders: number;
 }
 
 export const IntegratedMarginManager = () => {
@@ -40,6 +56,7 @@ export const IntegratedMarginManager = () => {
     iva_rate: '22',
     has_shipping_cost: true
   });
+  const [selectedMonth, setSelectedMonth] = useState('all');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -56,19 +73,26 @@ export const IntegratedMarginManager = () => {
       
       setMonthlyOrders(ordersData);
       
-      // Merge costs with sales data and calculate margins
+      // Enhanced data enrichment with proper margin calculations
       const enrichedCosts = costsData.map(cost => {
         const productSales = ordersData.filter(order => order.prodotto === cost.prodotto);
         const totalImponibile = productSales.reduce((sum, sale) => sum + sale.imponibile_totale, 0);
         const totalUnits = productSales.reduce((sum, sale) => sum + sale.pezzi_totali, 0);
         
-        // Calculate margin based on net revenue (imponibile)
+        // Calculate total costs
         const totalProductionCost = totalUnits * cost.production_cost;
         const totalPackagingCost = totalUnits * cost.packaging_cost;
-        const shippingCostForProduct = cost.has_shipping_cost ? 
-          (productSales.length > 0 ? parseFloat(defaultShippingCost) : 0) : 0;
         
-        const totalCosts = totalProductionCost + totalPackagingCost + shippingCostForProduct;
+        // Calculate shipping costs based on orders, not units
+        const uniqueMonths = [...new Set(productSales.map(sale => sale.month))];
+        const totalShippingCost = cost.has_shipping_cost ? 
+          uniqueMonths.reduce((sum, month) => {
+            const monthSales = productSales.filter(sale => sale.month === month);
+            const ordersForMonth = monthSales[0]?.total_orders || 0;
+            return sum + (ordersForMonth * parseFloat(defaultShippingCost));
+          }, 0) : 0;
+        
+        const totalCosts = totalProductionCost + totalPackagingCost + totalShippingCost;
         const totalMargin = totalImponibile - totalCosts;
         const marginPercentage = totalImponibile > 0 ? (totalMargin / totalImponibile) * 100 : 0;
         
@@ -77,10 +101,13 @@ export const IntegratedMarginManager = () => {
           monthly_sales: productSales.map(sale => ({
             pezzi_totali: sale.pezzi_totali,
             imponibile_totale: sale.imponibile_totale,
-            month: sale.month
+            month: sale.month,
+            total_orders: sale.total_orders
           })),
           total_margin: totalMargin,
-          margin_percentage: marginPercentage
+          margin_percentage: marginPercentage,
+          total_revenue: totalImponibile,
+          total_units: totalUnits
         };
       });
       
@@ -190,10 +217,58 @@ export const IntegratedMarginManager = () => {
     setEditingId(null);
   };
 
-  // Calculate totals
-  const totalNetRevenue = monthlyOrders.reduce((sum, order) => sum + order.imponibile_totale, 0);
-  const totalMargin = productCosts.reduce((sum, product) => sum + (product.total_margin || 0), 0);
+  // Generate margin reports by month
+  const generateMarginReports = (): MarginReport[] => {
+    const monthlyData = new Map<string, MarginReport>();
+    
+    // Initialize months from orders
+    monthlyOrders.forEach(order => {
+      if (!monthlyData.has(order.month)) {
+        monthlyData.set(order.month, {
+          month: order.month,
+          net_revenue: 0,
+          product_costs: 0,
+          packaging_costs: 0,
+          shipping_costs: 0,
+          ad_spend: 0,
+          total_costs: 0,
+          net_margin: 0,
+          margin_percentage: 0,
+          total_orders: order.total_orders || 0
+        });
+      }
+      
+      const report = monthlyData.get(order.month)!;
+      report.net_revenue += order.imponibile_totale;
+      
+      // Find product costs
+      const productCost = productCosts.find(pc => pc.prodotto === order.prodotto);
+      if (productCost) {
+        report.product_costs += order.pezzi_totali * productCost.production_cost;
+        report.packaging_costs += order.pezzi_totali * productCost.packaging_cost;
+        
+        if (productCost.has_shipping_cost) {
+          report.shipping_costs += (order.total_orders || 0) * parseFloat(defaultShippingCost);
+        }
+      }
+    });
+    
+    // Calculate final margins
+    return Array.from(monthlyData.values()).map(report => {
+      report.total_costs = report.product_costs + report.packaging_costs + report.shipping_costs + report.ad_spend;
+      report.net_margin = report.net_revenue - report.total_costs;
+      report.margin_percentage = report.net_revenue > 0 ? (report.net_margin / report.net_revenue) * 100 : 0;
+      return report;
+    }).sort((a, b) => new Date(b.month).getTime() - new Date(a.month).getTime());
+  };
+
+  const marginReports = generateMarginReports();
+  const totalNetRevenue = marginReports.reduce((sum, report) => sum + report.net_revenue, 0);
+  const totalMargin = marginReports.reduce((sum, report) => sum + report.net_margin, 0);
   const overallMarginPercentage = totalNetRevenue > 0 ? (totalMargin / totalNetRevenue) * 100 : 0;
+
+  // Get unique months for filter
+  const uniqueMonths = [...new Set(monthlyOrders.map(order => order.month))].sort().reverse();
 
   return (
     <div className="space-y-6">
@@ -210,7 +285,7 @@ export const IntegratedMarginManager = () => {
         <Card className={`${totalMargin >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
           <CardContent className="pt-4">
             <div className={`text-sm font-medium ${totalMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              Margine Totale
+              Margine Netto Totale
             </div>
             <div className={`text-2xl font-bold ${totalMargin >= 0 ? 'text-green-900' : 'text-red-900'}`}>
               €{totalMargin.toFixed(2)}
@@ -242,10 +317,10 @@ export const IntegratedMarginManager = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Gestione Costi e Margini Prodotti
+            Gestione Costi Prodotti
           </CardTitle>
           <CardDescription>
-            Configura i costi di produzione, packaging e aliquota IVA per calcolare i margini sul fatturato netto
+            Configura i costi di produzione, packaging e shipping per calcolare i margini reali
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -264,7 +339,7 @@ export const IntegratedMarginManager = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="production_cost">Costo Produzione (€)</Label>
+                <Label htmlFor="production_cost">Costo Produzione Unitario (€)</Label>
                 <Input
                   id="production_cost"
                   type="number"
@@ -278,7 +353,7 @@ export const IntegratedMarginManager = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="packaging_cost">Costo Packaging (€)</Label>
+                <Label htmlFor="packaging_cost">Costo Packaging Unitario (€)</Label>
                 <Input
                   id="packaging_cost"
                   type="number"
@@ -288,20 +363,6 @@ export const IntegratedMarginManager = () => {
                   value={formData.packaging_cost}
                   onChange={(e) => setFormData(prev => ({ ...prev, packaging_cost: e.target.value }))}
                   required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="iva_rate">Aliquota IVA (%)</Label>
-                <Input
-                  id="iva_rate"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  placeholder="22"
-                  value={formData.iva_rate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, iva_rate: e.target.value }))}
                 />
               </div>
               
@@ -339,14 +400,76 @@ export const IntegratedMarginManager = () => {
         </CardContent>
       </Card>
 
+      {/* Monthly Margin Reports */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Report Margini Mensili
+          </CardTitle>
+          <CardDescription>Analisi dettagliata dei margini per mese</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {marginReports.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Nessun dato disponibile. Carica prima i dati delle vendite.</p>
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead>Mese</TableHead>
+                    <TableHead className="text-right">Fatturato Netto</TableHead>
+                    <TableHead className="text-right">Costi Produzione</TableHead>
+                    <TableHead className="text-right">Costi Packaging</TableHead>
+                    <TableHead className="text-right">Costi Spedizione</TableHead>
+                    <TableHead className="text-right">Ordini Totali</TableHead>
+                    <TableHead className="text-right">Margine Netto</TableHead>
+                    <TableHead className="text-right">Margine %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {marginReports.map((report) => (
+                    <TableRow key={report.month}>
+                      <TableCell className="font-medium">
+                        {new Date(report.month).toLocaleDateString('it-IT', { year: 'numeric', month: 'long' })}
+                      </TableCell>
+                      <TableCell className="text-right">€{report.net_revenue.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">€{report.product_costs.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">€{report.packaging_costs.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">€{report.shipping_costs.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{report.total_orders}</TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-medium ${report.net_margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          €{report.net_margin.toFixed(2)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge 
+                          variant={report.margin_percentage >= 0 ? "default" : "destructive"}
+                          className={report.margin_percentage >= 0 ? "bg-green-100 text-green-800" : ""}
+                        >
+                          {report.margin_percentage.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Products Margin Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Analisi Margini per Prodotto
+            <Package className="h-5 w-5" />
+            Margini per Prodotto
           </CardTitle>
-          <CardDescription>Margini calcolati sul fatturato netto (imponibile)</CardDescription>
+          <CardDescription>Analisi dettagliata dei margini per ogni prodotto</CardDescription>
         </CardHeader>
         <CardContent>
           {productCosts.length === 0 ? (
@@ -370,18 +493,17 @@ export const IntegratedMarginManager = () => {
                 </TableHeader>
                 <TableBody>
                   {productCosts.map((product) => {
-                    const totalUnits = product.monthly_sales?.reduce((sum, sale) => sum + sale.pezzi_totali, 0) || 0;
-                    const totalRevenue = product.monthly_sales?.reduce((sum, sale) => sum + sale.imponibile_totale, 0) || 0;
-                    const totalCosts = (totalUnits * product.production_cost) + 
-                                     (totalUnits * product.packaging_cost) + 
-                                     (product.has_shipping_cost ? parseFloat(defaultShippingCost) : 0);
+                    const totalUnits = product.total_units || 0;
+                    const totalRevenue = product.total_revenue || 0;
                     
                     return (
                       <TableRow key={product.id}>
                         <TableCell className="font-medium">{product.prodotto}</TableCell>
                         <TableCell className="text-right">{totalUnits}</TableCell>
                         <TableCell className="text-right">€{totalRevenue.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">€{totalCosts.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">
+                          €{((totalUnits * product.production_cost) + (totalUnits * product.packaging_cost)).toFixed(2)}
+                        </TableCell>
                         <TableCell className="text-right">
                           <span className={`font-medium ${(product.total_margin || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             €{(product.total_margin || 0).toFixed(2)}

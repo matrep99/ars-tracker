@@ -15,8 +15,7 @@ interface SimplifiedDataEntryProps {
 export const SimplifiedDataEntry = ({ onDataSaved }: SimplifiedDataEntryProps) => {
   const [formData, setFormData] = useState({
     spesa_ads: '',
-    fatturato: '',
-    data: new Date().toISOString().split('T')[0]
+    month: new Date().toISOString().split('T')[0].slice(0, 7)
   });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -25,12 +24,11 @@ export const SimplifiedDataEntry = ({ onDataSaved }: SimplifiedDataEntryProps) =
     e.preventDefault();
     
     const spesa_ads = parseFloat(formData.spesa_ads);
-    const fatturato = parseFloat(formData.fatturato);
 
-    if (spesa_ads < 0 || fatturato < 0) {
+    if (spesa_ads < 0) {
       toast({
-        title: "Valori non validi",
-        description: "Tutti i valori devono essere numeri positivi",
+        title: "Valore non valido",
+        description: "La spesa ads deve essere un numero positivo",
         variant: "destructive"
       });
       return;
@@ -46,13 +44,12 @@ export const SimplifiedDataEntry = ({ onDataSaved }: SimplifiedDataEntryProps) =
       // Reset form
       setFormData({
         spesa_ads: '',
-        fatturato: '',
-        data: new Date().toISOString().split('T')[0]
+        month: new Date().toISOString().split('T')[0].slice(0, 7)
       });
       
       toast({
         title: "Dati salvati",
-        description: "I dati sono stati salvati con successo"
+        description: "La spesa ads è stata salvata con successo"
       });
       
       onDataSaved();
@@ -75,22 +72,22 @@ export const SimplifiedDataEntry = ({ onDataSaved }: SimplifiedDataEntryProps) =
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            Aggiungi Dati Manualmente
+            Aggiungi Spesa Ads
           </CardTitle>
           <CardDescription>
-            Inserisci rapidamente spesa ads e fatturato per il periodo selezionato
+            Inserisci la spesa pubblicitaria per il mese selezionato
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="data">Data</Label>
+                <Label htmlFor="month">Mese</Label>
                 <Input
-                  id="data"
-                  type="date"
-                  value={formData.data}
-                  onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
+                  id="month"
+                  type="month"
+                  value={formData.month}
+                  onChange={(e) => setFormData(prev => ({ ...prev, month: e.target.value }))}
                   required
                 />
               </div>
@@ -108,24 +105,10 @@ export const SimplifiedDataEntry = ({ onDataSaved }: SimplifiedDataEntryProps) =
                   required
                 />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="fatturato">Fatturato (€)</Label>
-                <Input
-                  id="fatturato"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="1500.00"
-                  value={formData.fatturato}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
-                  required
-                />
-              </div>
             </div>
 
             <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
-              {isLoading ? 'Salvataggio...' : 'Salva Dati'}
+              {isLoading ? 'Salvataggio...' : 'Salva Spesa Ads'}
             </Button>
           </form>
         </CardContent>
@@ -136,10 +119,10 @@ export const SimplifiedDataEntry = ({ onDataSaved }: SimplifiedDataEntryProps) =
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Carica Dati da CSV
+            Carica Dati Vendite da CSV
           </CardTitle>
           <CardDescription>
-            Carica un file CSV con i dati degli ordini mensili per un'analisi dettagliata
+            Carica un file CSV con i dati degli ordini mensili per un'analisi dettagliata dei margini
           </CardDescription>
         </CardHeader>
         <CardContent>

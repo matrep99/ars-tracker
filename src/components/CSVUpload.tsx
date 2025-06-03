@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileText, Trash2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { parseCSVContent, saveMonthlyOrderData, CSVRow } from '@/lib/monthlyOrderService';
+import { parseCSVContent, saveMonthlyOrderData, deleteMonthlyOrdersByMonth, CSVRow } from '@/lib/monthlyOrderService';
 
 interface CSVUploadProps {
   onDataUploaded: () => void;
@@ -18,6 +18,7 @@ interface CSVUploadProps {
 export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().split('T')[0].slice(0, 7));
   const [isAmazon, setIsAmazon] = useState(false);
+  const [totalOrders, setTotalOrders] = useState('');
   const [parsedData, setParsedData] = useState<CSVRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
@@ -85,33 +86,67 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
       return;
     }
 
+    if (!totalOrders || parseInt(totalOrders) <= 0) {
+      toast({
+        title: "Ordini totali richiesti",
+        description: "Inserisci il numero totale di ordini per il mese",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       const monthlyOrderData = parsedData.map(row => ({
-        month: selectedMonth + '-01', // Convert YYYY-MM to YYYY-MM-DD
+        month: selectedMonth + '-01',
         prodotto: row.prodotto,
         pezzi_totali: row.pezzi_totali,
         importo_totale_iva_inclusa: row.importo_totale_iva_inclusa,
         iva: row.iva,
         imponibile_totale: row.imponibile_totale,
-        is_amazon: isAmazon
+        is_amazon: isAmazon,
+        total_orders: parseInt(totalOrders)
       }));
 
       await saveMonthlyOrderData(monthlyOrderData);
       
       toast({
         title: "Dati salvati con successo",
-        description: `${parsedData.length} record salvati per ${selectedMonth}`
+        description: `${parsedData.length} record salvati per ${selectedMonth} con ${totalOrders} ordini totali`
       });
       
       setParsedData([]);
       setParseErrors([]);
+      setTotalOrders('');
       onDataUploaded();
     } catch (error) {
       console.error('Error saving data:', error);
       toast({
         title: "Errore nel salvataggio",
         description: "Impossibile salvare i dati",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteMonth = async () => {
+    if (!selectedMonth) return;
+
+    setIsLoading(true);
+    try {
+      await deleteMonthlyOrdersByMonth(selectedMonth + '-01');
+      toast({
+        title: "Dati eliminati",
+        description: `Tutti i dati per ${selectedMonth} sono stati eliminati`
+      });
+      onDataUploaded();
+    } catch (error) {
+      console.error('Error deleting month data:', error);
+      toast({
+        title: "Errore nell'eliminazione",
+        description: "Impossibile eliminare i dati del mese",
         variant: "destructive"
       });
     } finally {
@@ -142,7 +177,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="month">Mese di Riferimento</Label>
               <Input
@@ -150,6 +185,19 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
                 type="month"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="totalOrders">Ordini Totali</Label>
+              <Input
+                id="totalOrders"
+                type="number"
+                min="1"
+                placeholder="100"
+                value={totalOrders}
+                onChange={(e) => setTotalOrders(e.target.value)}
+                required
               />
             </div>
             
@@ -171,6 +219,18 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
               />
               <Label htmlFor="isAmazon">Dati Amazon</Label>
             </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={handleDeleteMonth}
+              disabled={isLoading}
+              className="text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Elimina Dati Mese
+            </Button>
           </div>
 
           {parseErrors.length > 0 && (
