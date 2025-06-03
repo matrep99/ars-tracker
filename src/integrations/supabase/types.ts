@@ -154,6 +154,140 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_orders: {
+        Row: {
+          created_at: string
+          id: string
+          imponibile_totale: number
+          importo_totale_iva_inclusa: number
+          is_amazon: boolean
+          iva: number
+          month: string
+          pezzi_totali: number
+          prodotto: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          imponibile_totale?: number
+          importo_totale_iva_inclusa?: number
+          is_amazon?: boolean
+          iva?: number
+          month: string
+          pezzi_totali?: number
+          prodotto: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          imponibile_totale?: number
+          importo_totale_iva_inclusa?: number
+          is_amazon?: boolean
+          iva?: number
+          month?: string
+          pezzi_totali?: number
+          prodotto?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          prodotto: string
+          quantity: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          prodotto: string
+          quantity?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          prodotto?: string
+          quantity?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          order_date: string
+          shipping_cost: number
+          total_revenue: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_date: string
+          shipping_cost?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_date?: string
+          shipping_cost?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      product_costs: {
+        Row: {
+          created_at: string
+          has_shipping_cost: boolean
+          id: string
+          packaging_cost: number
+          prodotto: string
+          production_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          has_shipping_cost?: boolean
+          id?: string
+          packaging_cost?: number
+          prodotto: string
+          production_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          has_shipping_cost?: boolean
+          id?: string
+          packaging_cost?: number
+          prodotto?: string
+          production_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       task_files: {
         Row: {
           created_at: string

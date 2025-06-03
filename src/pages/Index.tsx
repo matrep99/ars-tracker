@@ -29,6 +29,9 @@ import {
   CampaignWithProducts 
 } from '@/lib/supabaseService';
 import { getAllAmazonRevenue, getAmazonRevenueByDateRange } from '@/lib/amazonRevenueService';
+import { getAllMonthlyOrders, getMonthlyOrdersByDateRange } from '@/lib/monthlyOrderService';
+import { CSVUpload } from '@/components/CSVUpload';
+import { ProductCostManager } from '@/components/ProductCostManager';
 
 export interface DateRange {
   startDate: string;
@@ -61,6 +64,7 @@ const Index = () => {
     type: 'all'
   });
   const [amazonData, setAmazonData] = useState([]);
+  const [monthlyOrders, setMonthlyOrders] = useState([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -80,6 +84,7 @@ const Index = () => {
       setIsAuthenticated(true);
       loadCampaigns();
       loadAmazonData();
+      loadMonthlyOrders();
     }
   }, []);
 
@@ -87,6 +92,7 @@ const Index = () => {
     if (isAuthenticated && !isReadOnly) {
       loadCampaigns();
       loadAmazonData();
+      loadMonthlyOrders();
     }
   }, [dateRange]);
 
@@ -151,6 +157,20 @@ const Index = () => {
       setAmazonData(data);
     } catch (error) {
       console.error('Error loading Amazon data:', error);
+    }
+  };
+
+  const loadMonthlyOrders = async () => {
+    try {
+      let data;
+      if (dateRange.type !== 'all' && dateRange.startDate && dateRange.endDate) {
+        data = await getMonthlyOrdersByDateRange(dateRange.startDate, dateRange.endDate);
+      } else {
+        data = await getAllMonthlyOrders();
+      }
+      setMonthlyOrders(data);
+    } catch (error) {
+      console.error('Error loading monthly orders:', error);
     }
   };
 
@@ -388,12 +408,13 @@ const Index = () => {
           </div>
 
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="campaigns">Campagne</TabsTrigger>
               <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
               <TabsTrigger value="amazon">Amazon</TabsTrigger>
               <TabsTrigger value="margin">Calcolatore Margini</TabsTrigger>
+              <TabsTrigger value="costs">Costi Prodotti</TabsTrigger>
               {!isReadOnly && <TabsTrigger value="add">Aggiungi</TabsTrigger>}
             </TabsList>
 
@@ -501,152 +522,162 @@ const Index = () => {
               />
             </TabsContent>
 
+            <TabsContent value="costs" className="space-y-6">
+              <ProductCostManager />
+            </TabsContent>
+
             {!isReadOnly && (
               <TabsContent value="add" className="space-y-6">
-                <Card className="bg-white shadow-lg max-w-4xl mx-auto">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Plus className="h-5 w-5" />
-                      Aggiungi Nuova Campagna
-                    </CardTitle>
-                    <CardDescription>Inserisci i dati della tua campagna pubblicitaria</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="titolo">Titolo Campagna</Label>
-                          <Input
-                            id="titolo"
-                            placeholder="es. Campagna Facebook Natale"
-                            value={formData.titolo}
-                            onChange={(e) => setFormData(prev => ({ ...prev, titolo: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="data">Data</Label>
-                          <Input
-                            id="data"
-                            type="date"
-                            value={formData.data}
-                            onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="descrizione">Descrizione della Campagna</Label>
-                        <Textarea
-                          id="descrizione"
-                          placeholder="Descrivi la tua campagna pubblicitaria..."
-                          value={formData.descrizione}
-                          onChange={(e) => setFormData(prev => ({ ...prev, descrizione: e.target.value }))}
-                          rows={3}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="budget">Spesa Ads (€)</Label>
-                          <Input
-                            id="budget"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="1000.00"
-                            value={formData.budget}
-                            onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="fatturato">Fatturato Generato (€)</Label>
-                          <Input
-                            id="fatturato"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="1500.00"
-                            value={formData.fatturato}
-                            onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ordini">Numero di Ordini</Label>
-                          <Input
-                            id="ordini"
-                            type="number"
-                            min="0"
-                            placeholder="25"
-                            value={formData.ordini}
-                            onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="prodotti">Prodotti Venduti</Label>
-                          <Input
-                            id="prodotti"
-                            type="number"
-                            min="0"
-                            placeholder="50"
-                            value={formData.prodotti}
-                            onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <Label>Prodotti Più Venduti</Label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          <Input
-                            placeholder="Nome prodotto"
-                            value={productInput.nome}
-                            onChange={(e) => setProductInput(prev => ({ ...prev, nome: e.target.value }))}
-                          />
-                          <Input
-                            type="number"
-                            placeholder="Quantità"
-                            value={productInput.quantita}
-                            onChange={(e) => setProductInput(prev => ({ ...prev, quantita: e.target.value }))}
-                          />
-                          <Button type="button" onClick={addProduct}>
-                            Aggiungi Prodotto
-                          </Button>
-                        </div>
-
-                        {productList.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="bg-white shadow-lg">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Plus className="h-5 w-5" />
+                        Aggiungi Nuova Campagna
+                      </CardTitle>
+                      <CardDescription>Inserisci i dati della tua campagna pubblicitaria</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <h4 className="font-medium">Prodotti aggiunti:</h4>
-                            <div className="space-y-1">
-                              {productList.map((product, index) => (
-                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                  <span>{product.nome} - Qtà: {product.quantita}</span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeProduct(index)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
+                            <Label htmlFor="titolo">Titolo Campagna</Label>
+                            <Input
+                              id="titolo"
+                              placeholder="es. Campagna Facebook Natale"
+                              value={formData.titolo}
+                              onChange={(e) => setFormData(prev => ({ ...prev, titolo: e.target.value }))}
+                            />
                           </div>
-                        )}
-                      </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="data">Data</Label>
+                            <Input
+                              id="data"
+                              type="date"
+                              value={formData.data}
+                              onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
+                              required
+                            />
+                          </div>
+                        </div>
 
-                      <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
-                        {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
+                        <div className="space-y-2">
+                          <Label htmlFor="descrizione">Descrizione della Campagna</Label>
+                          <Textarea
+                            id="descrizione"
+                            placeholder="Descrivi la tua campagna pubblicitaria..."
+                            value={formData.descrizione}
+                            onChange={(e) => setFormData(prev => ({ ...prev, descrizione: e.target.value }))}
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="budget">Spesa Ads (€)</Label>
+                            <Input
+                              id="budget"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="1000.00"
+                              value={formData.budget}
+                              onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fatturato">Fatturato Generato (€)</Label>
+                            <Input
+                              id="fatturato"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="1500.00"
+                              value={formData.fatturato}
+                              onChange={(e) => setFormData(prev => ({ ...prev, fatturato: e.target.value }))}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ordini">Numero di Ordini</Label>
+                            <Input
+                              id="ordini"
+                              type="number"
+                              min="0"
+                              placeholder="25"
+                              value={formData.ordini}
+                              onChange={(e) => setFormData(prev => ({ ...prev, ordini: e.target.value }))}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="prodotti">Prodotti Venduti</Label>
+                            <Input
+                              id="prodotti"
+                              type="number"
+                              min="0"
+                              placeholder="50"
+                              value={formData.prodotti}
+                              onChange={(e) => setFormData(prev => ({ ...prev, prodotti: e.target.value }))}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <Label>Prodotti Più Venduti</Label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <Input
+                              placeholder="Nome prodotto"
+                              value={productInput.nome}
+                              onChange={(e) => setProductInput(prev => ({ ...prev, nome: e.target.value }))}
+                            />
+                            <Input
+                              type="number"
+                              placeholder="Quantità"
+                              value={productInput.quantita}
+                              onChange={(e) => setProductInput(prev => ({ ...prev, quantita: e.target.value }))}
+                            />
+                            <Button type="button" onClick={addProduct}>
+                              Aggiungi Prodotto
+                            </Button>
+                          </div>
+
+                          {productList.length > 0 && (
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Prodotti aggiunti:</h4>
+                              <div className="space-y-1">
+                                {productList.map((product, index) => (
+                                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                    <span>{product.nome} - Qtà: {product.quantita}</span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeProduct(index)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+                          {isLoading ? 'Salvataggio...' : 'Salva Campagna'}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  <div className="space-y-6">
+                    <CSVUpload onDataUploaded={() => { loadMonthlyOrders(); loadAmazonData(); }} />
+                  </div>
+                </div>
               </TabsContent>
             )}
           </Tabs>
