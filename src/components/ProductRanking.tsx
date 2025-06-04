@@ -1,21 +1,35 @@
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { CampaignRecord, Product } from '@/lib/campaignStorage';
+import { getAllMonthlyOrders, MonthlyOrderData } from '@/lib/monthlyOrderService';
 
-interface ProductRankingProps {
-  campaigns: CampaignRecord[];
-}
+export const ProductRanking = () => {
+  const [monthlyOrders, setMonthlyOrders] = useState<MonthlyOrderData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-export const ProductRanking = ({ campaigns }: ProductRankingProps) => {
+  useEffect(() => {
+    loadMonthlyOrders();
+  }, []);
+
+  const loadMonthlyOrders = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getAllMonthlyOrders();
+      setMonthlyOrders(data);
+    } catch (error) {
+      console.error('Error loading monthly orders:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const aggregateProducts = () => {
     const productMap = new Map<string, number>();
     
-    campaigns.forEach(campaign => {
-      campaign.prodottiVenduti.forEach(product => {
-        const current = productMap.get(product.nome) || 0;
-        productMap.set(product.nome, current + product.quantita);
-      });
+    monthlyOrders.forEach(order => {
+      const current = productMap.get(order.prodotto) || 0;
+      productMap.set(order.prodotto, current + order.pezzi_totali);
     });
 
     return Array.from(productMap.entries())
@@ -26,12 +40,26 @@ export const ProductRanking = ({ campaigns }: ProductRankingProps) => {
 
   const topProducts = aggregateProducts();
 
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Classifica Prodotti Più Venduti</CardTitle>
+          <CardDescription>Caricamento dati...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-64">
+          <p className="text-gray-500">Caricamento...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (topProducts.length === 0) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Classifica Prodotti Più Venduti</CardTitle>
-          <CardDescription>Aggiungi prodotti alle tue campagne per visualizzare la classifica</CardDescription>
+          <CardDescription>Carica dati CSV per visualizzare la classifica</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-64">
           <p className="text-gray-500">Nessun prodotto trovato</p>

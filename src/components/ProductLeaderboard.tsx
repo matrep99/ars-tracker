@@ -1,16 +1,12 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CampaignWithProducts } from '@/lib/supabaseService';
 import { Trophy, Medal, Award } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-
-interface ProductLeaderboardProps {
-  campaigns: CampaignWithProducts[];
-}
+import { getAllMonthlyOrders, MonthlyOrderData } from '@/lib/monthlyOrderService';
 
 interface ProductRanking {
   position: number;
@@ -18,36 +14,52 @@ interface ProductRanking {
   quantita: number;
 }
 
-export const ProductLeaderboard = ({ campaigns }: ProductLeaderboardProps) => {
+export const ProductLeaderboard = () => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [monthlyOrders, setMonthlyOrders] = useState<MonthlyOrderData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Get all available months from campaigns
+  useEffect(() => {
+    loadMonthlyOrders();
+  }, []);
+
+  const loadMonthlyOrders = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getAllMonthlyOrders();
+      setMonthlyOrders(data);
+    } catch (error) {
+      console.error('Error loading monthly orders:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Get all available months from monthly orders
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
-    campaigns.forEach(campaign => {
-      const date = parseISO(campaign.data);
+    monthlyOrders.forEach(order => {
+      const date = parseISO(order.month);
       const monthKey = format(date, 'yyyy-MM');
       months.add(monthKey);
     });
     return Array.from(months).sort().reverse();
-  }, [campaigns]);
+  }, [monthlyOrders]);
 
-  // Calculate general leaderboard (all campaigns)
+  // Calculate general leaderboard (all orders)
   const generalLeaderboard = useMemo(() => {
     const productMap = new Map<string, number>();
     
-    campaigns.forEach(campaign => {
-      campaign.campaign_products.forEach(product => {
-        const current = productMap.get(product.nome) || 0;
-        productMap.set(product.nome, current + product.quantita);
-      });
+    monthlyOrders.forEach(order => {
+      const current = productMap.get(order.prodotto) || 0;
+      productMap.set(order.prodotto, current + order.pezzi_totali);
     });
 
     return Array.from(productMap.entries())
       .map(([nome, quantita], index) => ({ position: index + 1, nome, quantita }))
       .sort((a, b) => b.quantita - a.quantita)
       .map((item, index) => ({ ...item, position: index + 1 }));
-  }, [campaigns]);
+  }, [monthlyOrders]);
 
   // Calculate monthly leaderboard
   const monthlyLeaderboard = useMemo(() => {
@@ -55,13 +67,11 @@ export const ProductLeaderboard = ({ campaigns }: ProductLeaderboardProps) => {
     
     const productMap = new Map<string, number>();
     
-    campaigns.forEach(campaign => {
-      const campaignMonth = format(parseISO(campaign.data), 'yyyy-MM');
-      if (campaignMonth === selectedMonth) {
-        campaign.campaign_products.forEach(product => {
-          const current = productMap.get(product.nome) || 0;
-          productMap.set(product.nome, current + product.quantita);
-        });
+    monthlyOrders.forEach(order => {
+      const orderMonth = format(parseISO(order.month), 'yyyy-MM');
+      if (orderMonth === selectedMonth) {
+        const current = productMap.get(order.prodotto) || 0;
+        productMap.set(order.prodotto, current + order.pezzi_totali);
       }
     });
 
@@ -69,7 +79,7 @@ export const ProductLeaderboard = ({ campaigns }: ProductLeaderboardProps) => {
       .map(([nome, quantita], index) => ({ position: index + 1, nome, quantita }))
       .sort((a, b) => b.quantita - a.quantita)
       .map((item, index) => ({ ...item, position: index + 1 }));
-  }, [campaigns, selectedMonth]);
+  }, [monthlyOrders, selectedMonth]);
 
   const currentLeaderboard = selectedMonth ? monthlyLeaderboard : generalLeaderboard;
 
@@ -99,12 +109,26 @@ export const ProductLeaderboard = ({ campaigns }: ProductLeaderboardProps) => {
     }
   };
 
-  if (campaigns.length === 0) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Classifica Prodotti</CardTitle>
-          <CardDescription>Aggiungi campagne per visualizzare la classifica dei prodotti</CardDescription>
+          <CardDescription>Caricamento dati...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-64">
+          <p className="text-gray-500">Caricamento...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (monthlyOrders.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Classifica Prodotti</CardTitle>
+          <CardDescription>Carica dati CSV per visualizzare la classifica dei prodotti</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-64">
           <p className="text-gray-500">Nessun prodotto trovato</p>
