@@ -419,7 +419,7 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="products" className="space-y-6">
-              <ProductLeaderboard campaigns={displayCampaigns} />
+              <ProductLeaderboard />
             </TabsContent>
 
             <TabsContent value="amazon" className="space-y-6">
