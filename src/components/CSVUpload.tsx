@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileText, Trash2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { parseCSVContent, saveMonthlyOrderData, deleteMonthlyOrdersByMonth, CSVRow } from '@/lib/monthlyOrderService';
+import { parseCSVContent, saveMonthlyOrderData, deleteMonthlyOrdersByMonth, deleteMonthlyOrder, getAllMonthlyOrders, CSVRow } from '@/lib/monthlyOrderService';
 
 interface CSVUploadProps {
   onDataUploaded: () => void;
@@ -20,6 +20,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
   const [isAmazon, setIsAmazon] = useState(false);
   const [totalOrders, setTotalOrders] = useState('');
   const [parsedData, setParsedData] = useState<CSVRow[]>([]);
+  const [uploadedData, setUploadedData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const { toast } = useToast();
@@ -99,7 +100,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
     try {
       const monthlyOrderData = parsedData.map(row => ({
         month: selectedMonth + '-01',
-        prodotto: row.prodotto,
+        prodotto: row.prodotto, // Ensure product name is saved
         pezzi_totali: row.pezzi_totali,
         importo_totale_iva_inclusa: row.importo_totale_iva_inclusa,
         iva: row.iva,
@@ -108,7 +109,8 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
         total_orders: parseInt(totalOrders)
       }));
 
-      await saveMonthlyOrderData(monthlyOrderData);
+      console.log('Saving monthly order data:', monthlyOrderData);
+      const savedData = await saveMonthlyOrderData(monthlyOrderData);
       
       toast({
         title: "Dati salvati con successo",
@@ -118,6 +120,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
       setParsedData([]);
       setParseErrors([]);
       setTotalOrders('');
+      await loadUploadedData();
       onDataUploaded();
     } catch (error) {
       console.error('Error saving data:', error);
@@ -131,6 +134,16 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
     }
   };
 
+  const loadUploadedData = async () => {
+    try {
+      const allData = await getAllMonthlyOrders();
+      const monthData = allData.filter(item => item.month.startsWith(selectedMonth));
+      setUploadedData(monthData);
+    } catch (error) {
+      console.error('Error loading uploaded data:', error);
+    }
+  };
+
   const handleDeleteMonth = async () => {
     if (!selectedMonth) return;
 
@@ -141,6 +154,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
         title: "Dati eliminati",
         description: `Tutti i dati per ${selectedMonth} sono stati eliminati`
       });
+      setUploadedData([]);
       onDataUploaded();
     } catch (error) {
       console.error('Error deleting month data:', error);
@@ -154,10 +168,39 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
     }
   };
 
+  const handleDeleteRow = async (id: string) => {
+    setIsLoading(true);
+    try {
+      await deleteMonthlyOrder(id);
+      toast({
+        title: "Riga eliminata",
+        description: "La riga è stata eliminata con successo"
+      });
+      await loadUploadedData();
+      onDataUploaded();
+    } catch (error) {
+      console.error('Error deleting row:', error);
+      toast({
+        title: "Errore nell'eliminazione",
+        description: "Impossibile eliminare la riga",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const clearData = () => {
     setParsedData([]);
     setParseErrors([]);
   };
+
+  // Load uploaded data when month changes
+  React.useEffect(() => {
+    if (selectedMonth) {
+      loadUploadedData();
+    }
+  }, [selectedMonth]);
 
   const totalRevenue = parsedData.reduce((sum, row) => sum + row.importo_totale_iva_inclusa, 0);
   const totalTaxable = parsedData.reduce((sum, row) => sum + row.imponibile_totale, 0);
@@ -248,6 +291,56 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
         </CardContent>
       </Card>
 
+      {/* Uploaded Data Table */}
+      {uploadedData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Dati Caricati per {selectedMonth}</CardTitle>
+            <CardDescription>
+              {uploadedData.length} prodotti caricati
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-hidden max-h-96 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead>Prodotto</TableHead>
+                    <TableHead className="text-right">Pezzi</TableHead>
+                    <TableHead className="text-right">Importo Tot. (€)</TableHead>
+                    <TableHead className="text-right">IVA (€)</TableHead>
+                    <TableHead className="text-right">Imponibile (€)</TableHead>
+                    <TableHead className="text-center">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {uploadedData.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium">{row.prodotto}</TableCell>
+                      <TableCell className="text-right">{row.pezzi_totali}</TableCell>
+                      <TableCell className="text-right">€{row.importo_totale_iva_inclusa.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">€{row.iva.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">€{row.imponibile_totale.toFixed(2)}</TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteRow(row.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Preview Data Table */}
       {parsedData.length > 0 && (
         <Card>
           <CardHeader>

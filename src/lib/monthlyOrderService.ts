@@ -141,20 +141,30 @@ const parseNumericValue = (value: string): number => {
   }
   
   // Handle thousand separators and decimal points
-  // Replace comma with dot for decimal separator if it's the last comma/dot
+  // If there are multiple dots or commas, assume the last one is decimal separator
   const lastCommaIndex = cleanValue.lastIndexOf(',');
   const lastDotIndex = cleanValue.lastIndexOf('.');
   
-  if (lastCommaIndex > lastDotIndex && lastCommaIndex > cleanValue.length - 4) {
-    // Last comma is likely decimal separator
+  // Count dots and commas to determine format
+  const dotCount = (cleanValue.match(/\./g) || []).length;
+  const commaCount = (cleanValue.match(/,/g) || []).length;
+  
+  if (dotCount > 1 && commaCount === 0) {
+    // Format: 1.234.567 (thousand separators with dots)
+    cleanValue = cleanValue.replace(/\./g, '');
+  } else if (commaCount > 1 && dotCount === 0) {
+    // Format: 1,234,567 (thousand separators with commas)
+    cleanValue = cleanValue.replace(/,/g, '');
+  } else if (lastCommaIndex > lastDotIndex && lastCommaIndex > cleanValue.length - 4) {
+    // Last comma is likely decimal separator (e.g., 1.234,56)
     cleanValue = cleanValue.substring(0, lastCommaIndex) + '.' + cleanValue.substring(lastCommaIndex + 1);
     cleanValue = cleanValue.replace(/,/g, ''); // Remove other commas
   } else if (lastDotIndex > lastCommaIndex && lastDotIndex > cleanValue.length - 4) {
-    // Last dot is likely decimal separator, remove commas
-    cleanValue = cleanValue.replace(/,/g, '');
-  } else {
-    // No clear decimal separator, remove all
-    cleanValue = cleanValue.replace(/[.,]/g, '');
+    // Last dot is likely decimal separator (e.g., 1,234.56)
+    cleanValue = cleanValue.replace(/,/g, ''); // Remove commas
+  } else if (commaCount === 1 && dotCount === 0) {
+    // Single comma, treat as decimal separator
+    cleanValue = cleanValue.replace(',', '.');
   }
   
   const num = parseFloat(cleanValue);
@@ -243,7 +253,14 @@ export const parseCSVContent = (csvContent: string): CSVRow[] => {
         continue;
       }
       
+      // Extract and validate product name
       const prodotto = values[headerMap['prodotto']] || '';
+      if (!prodotto || prodotto.trim() === '') {
+        errors.push(`Row ${i}: Missing product name`);
+        console.warn(`Skipping row ${i} due to missing product name:`, values);
+        continue;
+      }
+      
       const pezzi_totali = parseNumericValue(values[headerMap['pezzi_totali']] || '0');
       const importo_totale_iva_inclusa = parseNumericValue(values[headerMap['importo_totale_iva_inclusa']] || '0');
       
@@ -257,7 +274,8 @@ export const parseCSVContent = (csvContent: string): CSVRow[] => {
         
         // If IVA is a percentage, calculate absolute value
         if (ivaValue.includes('%') || (iva > 0 && iva <= 100 && importo_totale_iva_inclusa > iva)) {
-          iva = (importo_totale_iva_inclusa * iva) / (100 + iva);
+          const ivaRate = iva / 100;
+          iva = importo_totale_iva_inclusa * ivaRate / (1 + ivaRate);
         }
       }
       
@@ -269,7 +287,7 @@ export const parseCSVContent = (csvContent: string): CSVRow[] => {
       }
       
       // Validate data quality
-      if (prodotto && prodotto.trim() !== '' && importo_totale_iva_inclusa > 0 && pezzi_totali > 0) {
+      if (importo_totale_iva_inclusa > 0 && pezzi_totali > 0) {
         const row: CSVRow = {
           prodotto: prodotto.trim(),
           pezzi_totali,
@@ -281,8 +299,7 @@ export const parseCSVContent = (csvContent: string): CSVRow[] => {
         rows.push(row);
         console.log(`Successfully parsed row ${i}:`, row);
       } else {
-        const reason = !prodotto ? 'No product name' : 
-                     importo_totale_iva_inclusa <= 0 ? 'Invalid amount' :
+        const reason = importo_totale_iva_inclusa <= 0 ? 'Invalid amount' :
                      pezzi_totali <= 0 ? 'Invalid quantity' : 'Unknown reason';
         errors.push(`Row ${i}: Invalid data - ${reason}`);
         console.warn(`Skipping row ${i} due to invalid data (${reason}):`, values);

@@ -1,7 +1,6 @@
+
 import { saveAdRecord } from '@/lib/adStorage';
 import { v4 as uuidv4 } from 'uuid';
-npm install uuid
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Upload } from 'lucide-react';
 import { CSVUpload } from './CSVUpload';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SimplifiedDataEntryProps {
   onDataSaved: () => void;
@@ -38,45 +38,56 @@ export const SimplifiedDataEntry = ({ onDataSaved }: SimplifiedDataEntryProps) =
     }
 
     try {
-  setIsLoading(true);
+      setIsLoading(true);
 
-  const record = {
-    id: uuidv4(),
-    campaignName: "Default Campaign", // puoi anche farlo scegliere all’utente
-    budget: spesa_ads,
-    revenue: 0,
-    orders: 0,
-    products: 0,
-    date: `${formData.month}-01`,
-    roi: 0,
-    aov: 0,
-    productsPerOrder: 0,
-    createdAt: new Date().toISOString()
+      // Save to Supabase campaigns table instead of local storage
+      const { data, error } = await supabase
+        .from('campaigns')
+        .insert({
+          titolo: `Spesa Ads ${formData.month}`,
+          descrizione: `Spesa pubblicitaria per ${formData.month}`,
+          budget: spesa_ads,
+          fatturato: 0,
+          ordini: 0,
+          prodotti: 0,
+          data: `${formData.month}-01`,
+          roi: 0,
+          valore_medio_ordine: 0,
+          prodotti_medi_per_ordine: 0
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving to Supabase:', error);
+        throw error;
+      }
+
+      console.log('Campaign saved to Supabase:', data);
+
+      // Reset form
+      setFormData({
+        spesa_ads: '',
+        month: new Date().toISOString().split('T')[0].slice(0, 7)
+      });
+
+      toast({
+        title: "Dati salvati",
+        description: "La spesa ads è stata salvata con successo"
+      });
+
+      onDataSaved();
+    } catch (error) {
+      console.error('Error saving data:', error);
+      toast({
+        title: "Errore nel salvataggio",
+        description: "Impossibile salvare i dati",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-  await saveAdRecord(record);
-
-  // Reset form
-  setFormData({
-    spesa_ads: '',
-    month: new Date().toISOString().split('T')[0].slice(0, 7)
-  });
-
-  toast({
-    title: "Dati salvati",
-    description: "La spesa ads è stata salvata con successo"
-  });
-
-  onDataSaved();
-} catch (error) {
-  console.error('Error saving data:', error);
-  toast({
-    title: "Errore nel salvataggio",
-    description: "Impossibile salvare i dati",
-    variant: "destructive"
-  });
-}
-
 
   return (
     <div className="space-y-6">

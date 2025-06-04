@@ -156,6 +156,7 @@ export type Database = {
       }
       monthly_orders: {
         Row: {
+          ads_spent: number
           created_at: string
           id: string
           imponibile_totale: number
@@ -165,9 +166,11 @@ export type Database = {
           month: string
           pezzi_totali: number
           prodotto: string
+          total_orders: number
           updated_at: string
         }
         Insert: {
+          ads_spent?: number
           created_at?: string
           id?: string
           imponibile_totale?: number
@@ -177,9 +180,11 @@ export type Database = {
           month: string
           pezzi_totali?: number
           prodotto: string
+          total_orders?: number
           updated_at?: string
         }
         Update: {
+          ads_spent?: number
           created_at?: string
           id?: string
           imponibile_totale?: number
@@ -189,6 +194,7 @@ export type Database = {
           month?: string
           pezzi_totali?: number
           prodotto?: string
+          total_orders?: number
           updated_at?: string
         }
         Relationships: []
