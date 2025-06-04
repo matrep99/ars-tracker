@@ -18,10 +18,27 @@ import {
   AmazonRevenueData 
 } from '@/lib/amazonRevenueService';
 import type { DateRange } from './DateFilter';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 interface AmazonRevenueProps {
   dateRange?: DateRange;
 }
+
+const chartConfig = {
+  fatturato: {
+    label: "Fatturato",
+    color: "hsl(142, 76%, 36%)",
+  },
+  spesa_ads: {
+    label: "Spesa Ads",
+    color: "hsl(346, 87%, 43%)",
+  },
+  roi: {
+    label: "ROI",
+    color: "hsl(262, 83%, 58%)",
+  },
+};
 
 export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
   const [amazonData, setAmazonData] = useState<AmazonRevenueData[]>([]);
@@ -128,6 +145,16 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
   const totalAmazonSpend = amazonData.reduce((sum, record) => sum + record.spesa_ads, 0);
   const overallAmazonROI = totalAmazonSpend > 0 ? ((totalAmazonRevenue - totalAmazonSpend) / totalAmazonSpend) * 100 : 0;
 
+  // Prepare chart data sorted by date
+  const chartData = amazonData
+    .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime())
+    .map(record => ({
+      month: format(new Date(record.month), 'MMM yyyy', { locale: it }),
+      fatturato: record.fatturato,
+      spesa_ads: record.spesa_ads,
+      roi: record.roi
+    }));
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -164,6 +191,57 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Charts Section */}
+      {chartData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-white shadow-lg">
+            <CardHeader>
+              <CardTitle>Performance di Vendita nel Tempo</CardTitle>
+              <CardDescription>Andamento del fatturato Amazon mensile</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={chartConfig} className="h-[300px]">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="fatturato"
+                    stroke="var(--color-fatturato)"
+                    strokeWidth={2}
+                    dot={{ fill: "var(--color-fatturato)" }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-lg">
+            <CardHeader>
+              <CardTitle>Spesa Pubblicitaria nel Tempo</CardTitle>
+              <CardDescription>Andamento della spesa ads Amazon mensile</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={chartConfig} className="h-[300px]">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar
+                    dataKey="spesa_ads"
+                    fill="var(--color-spesa_ads)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Add New Revenue Form */}
       <Card className="bg-white shadow-lg">

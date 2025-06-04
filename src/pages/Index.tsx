@@ -228,8 +228,9 @@ const Index = () => {
   const overallROI = totalSpesaAds > 0 ? ((totalFatturato - totalSpesaAds) / totalSpesaAds) * 100 : 0;
   const avgValoreMedioOrdine = totalOrdini > 0 ? totalFatturato / totalOrdini : 0;
 
-  // Calculate net revenue from monthly orders for summary
+  // Calculate both gross and net revenue from monthly orders
   const totalNetRevenue = monthlyOrders.reduce((sum, order) => sum + (order.imponibile_totale || 0), 0);
+  const totalGrossRevenue = monthlyOrders.reduce((sum, order) => sum + (order.importo_totale_iva_inclusa || 0), 0);
 
   return (
     <TooltipProvider>
@@ -263,18 +264,20 @@ const Index = () => {
             </div>
           )}
 
-          {/* Date Filter */}
+          {/* Date Filter - Smaller and Centered */}
           {!isReadOnly && (
-            <div className="mb-6">
-              <DateFilter
-                onDateRangeChange={setDateRange}
-                currentRange={dateRange}
-              />
+            <div className="mb-6 flex justify-center">
+              <div className="w-full max-w-2xl">
+                <DateFilter
+                  onDateRangeChange={setDateRange}
+                  currentRange={dateRange}
+                />
+              </div>
             </div>
           )}
 
-          {/* Summary Cards - Updated to show net revenue */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Summary Cards - Updated to show both gross and net revenue */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">Spesa Ads Totale</CardTitle>
@@ -282,6 +285,17 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">€{totalSpesaAds.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Fatturato Lordo</CardTitle>
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">€{totalGrossRevenue.toLocaleString()}</div>
+                <div className="text-xs text-gray-500 mt-1">IVA inclusa</div>
               </CardContent>
             </Card>
 

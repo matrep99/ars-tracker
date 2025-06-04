@@ -85,29 +85,30 @@ export const DateFilter = ({ onDateRangeChange, currentRange }: DateFilterProps)
   };
 
   return (
-    <Card className="bg-white shadow-lg">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Calendar className="h-5 w-5" />
+    <Card className="bg-white shadow-md">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-center gap-2 text-base">
+          <Calendar className="h-4 w-4" />
           Filtro Date
           {currentRange.type !== 'all' && (
             <Button
               variant="ghost"
               size="sm"
               onClick={clearFilter}
-              className="ml-auto text-gray-500 hover:text-gray-700"
+              className="ml-auto text-gray-500 hover:text-gray-700 h-6 w-6 p-0"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3 w-3" />
             </Button>
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <div className="grid grid-cols-3 gap-2">
           <Button
             variant={filterType === 'all' ? 'default' : 'outline'}
             onClick={() => handleFilterChange('all')}
             size="sm"
+            className="text-xs"
           >
             Tutti
           </Button>
@@ -115,6 +116,7 @@ export const DateFilter = ({ onDateRangeChange, currentRange }: DateFilterProps)
             variant={filterType === 'month' ? 'default' : 'outline'}
             onClick={() => handleFilterChange('month')}
             size="sm"
+            className="text-xs"
           >
             Mese
           </Button>
@@ -122,6 +124,7 @@ export const DateFilter = ({ onDateRangeChange, currentRange }: DateFilterProps)
             variant={filterType === 'custom' ? 'default' : 'outline'}
             onClick={() => handleFilterChange('custom')}
             size="sm"
+            className="text-xs"
           >
             Personalizzato
           </Button>
@@ -129,14 +132,14 @@ export const DateFilter = ({ onDateRangeChange, currentRange }: DateFilterProps)
 
         {filterType === 'month' && (
           <div className="space-y-2">
-            <Label>Seleziona Mese</Label>
+            <Label className="text-xs">Seleziona Mese</Label>
             <Select value={selectedMonth} onValueChange={handleMonthSelect}>
-              <SelectTrigger>
+              <SelectTrigger className="text-xs">
                 <SelectValue placeholder="Seleziona un mese" />
               </SelectTrigger>
               <SelectContent>
                 {generateMonthOptions().map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
+                  <SelectItem key={option.value} value={option.value} className="text-xs">
                     {option.label}
                   </SelectItem>
                 ))}
@@ -149,27 +152,30 @@ export const DateFilter = ({ onDateRangeChange, currentRange }: DateFilterProps)
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label htmlFor="start-date">Data Inizio</Label>
+                <Label htmlFor="start-date" className="text-xs">Data Inizio</Label>
                 <Input
                   id="start-date"
                   type="date"
                   value={customStart}
                   onChange={(e) => setCustomStart(e.target.value)}
+                  className="text-xs"
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="end-date">Data Fine</Label>
+                <Label htmlFor="end-date" className="text-xs">Data Fine</Label>
                 <Input
                   id="end-date"
                   type="date"
                   value={customEnd}
                   onChange={(e) => setCustomEnd(e.target.value)}
+                  className="text-xs"
                 />
               </div>
             </div>
             <Button 
               onClick={handleCustomRange} 
-              className="w-full"
+              className="w-full text-xs"
+              size="sm"
               disabled={!customStart || !customEnd}
             >
               Applica Filtro
@@ -178,7 +184,7 @@ export const DateFilter = ({ onDateRangeChange, currentRange }: DateFilterProps)
         )}
 
         {currentRange.type !== 'all' && (
-          <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
+          <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
             <strong>Filtro attivo:</strong>{' '}
             {currentRange.type === 'month' 
               ? format(new Date(currentRange.startDate), 'MMMM yyyy', { locale: it })
