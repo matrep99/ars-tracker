@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Plus, TrendingUp, DollarSign, Target } from 'lucide-react';
+import { Trash2, Plus, TrendingUp, DollarSign, Target, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { 
@@ -17,6 +16,7 @@ import {
   getAmazonRevenueByDateRange,
   AmazonRevenueData 
 } from '@/lib/amazonRevenueService';
+import { getAllMonthlyOrders } from '@/lib/monthlyOrderService';
 import type { DateRange } from './DateFilter';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar } from 'recharts';
@@ -42,6 +42,7 @@ const chartConfig = {
 
 export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
   const [amazonData, setAmazonData] = useState<AmazonRevenueData[]>([]);
+  const [amazonProducts, setAmazonProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     month: new Date().toISOString().slice(0, 7), // YYYY-MM format
@@ -52,6 +53,7 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
 
   useEffect(() => {
     loadAmazonRevenue();
+    loadAmazonProducts();
   }, [dateRange]);
 
   const loadAmazonRevenue = async () => {
@@ -75,6 +77,17 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAmazonProducts = async () => {
+    try {
+      const monthlyOrders = await getAllMonthlyOrders();
+      // Filter for Amazon products (is_amazon = true)
+      const amazonProductsData = monthlyOrders.filter(order => order.is_amazon);
+      setAmazonProducts(amazonProductsData);
+    } catch (error) {
+      console.error('Error loading Amazon products:', error);
     }
   };
 
@@ -155,10 +168,57 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
       roi: record.roi
     }));
 
+  // Aggregate Amazon products by month for product performance view
+  const getAmazonProductsByMonth = () => {
+    const productsByMonth = new Map<string, Map<string, number>>();
+    
+    amazonProducts.forEach(product => {
+      const monthKey = format(new Date(product.month), 'MMM yyyy', { locale: it });
+      
+      if (!productsByMonth.has(monthKey)) {
+        productsByMonth.set(monthKey, new Map());
+      }
+      
+      const monthProducts = productsByMonth.get(monthKey)!;
+      const currentQuantity = monthProducts.get(product.prodotto) || 0;
+      monthProducts.set(product.prodotto, currentQuantity + product.pezzi_totali);
+    });
+
+    return Array.from(productsByMonth.entries()).map(([month, products]) => ({
+      month,
+      products: Array.from(products.entries())
+        .map(([nome, quantita]) => ({ nome, quantita }))
+        .sort((a, b) => b.quantita - a.quantita)
+    }));
+  };
+
+  const amazonProductsByMonth = getAmazonProductsByMonth();
+
+  // Get top Amazon products overall
+  const getTopAmazonProducts = () => {
+    const productTotals = new Map<string, { total: number; revenue: number }>();
+    
+    amazonProducts.forEach(product => {
+      if (!productTotals.has(product.prodotto)) {
+        productTotals.set(product.prodotto, { total: 0, revenue: 0 });
+      }
+      
+      const productData = productTotals.get(product.prodotto)!;
+      productData.total += product.pezzi_totali;
+      productData.revenue += product.importo_totale_iva_inclusa;
+    });
+
+    return Array.from(productTotals.entries())
+      .map(([nome, data]) => ({ nome, ...data }))
+      .sort((a, b) => b.total - a.total);
+  };
+
+  const topAmazonProducts = getTopAmazonProducts();
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Fatturato Amazon Totale</CardTitle>
@@ -188,6 +248,16 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
             <div className={`text-2xl font-bold ${overallAmazonROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {overallAmazonROI.toFixed(1)}%
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Prodotti Amazon Attivi</CardTitle>
+            <Package className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{topAmazonProducts.length}</div>
           </CardContent>
         </Card>
       </div>
@@ -241,6 +311,56 @@ export const AmazonRevenue = ({ dateRange }: AmazonRevenueProps) => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Amazon Products Performance */}
+      {topAmazonProducts.length > 0 && (
+        <Card className="bg-white shadow-lg">
+          <CardHeader>
+            <CardTitle>Performance Prodotti Amazon</CardTitle>
+            <CardDescription>Prodotti Amazon più venduti e loro performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Top Products Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {topAmazonProducts.slice(0, 6).map((product, index) => (
+                  <div key={product.nome} className="p-4 bg-orange-50 rounded-lg border">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="secondary">#{index + 1}</Badge>
+                      <span className="text-sm font-medium text-orange-600">
+                        €{product.revenue.toLocaleString()}
+                      </span>
+                    </div>
+                    <h4 className="font-medium text-gray-900 mb-1">{product.nome}</h4>
+                    <p className="text-sm text-gray-600">{product.total} unità vendute</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Monthly Breakdown */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-semibold">Vendite Mensili per Prodotto</h4>
+                {amazonProductsByMonth.map(({ month, products }) => (
+                  <div key={month} className="p-4 bg-gray-50 rounded-lg">
+                    <h5 className="font-medium text-gray-900 mb-3">{month}</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {products.slice(0, 6).map((product, index) => (
+                        <div key={`${month}-${product.nome}`} className="flex justify-between items-center bg-white p-3 rounded">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">#{index + 1}</Badge>
+                            <span className="text-sm font-medium">{product.nome}</span>
+                          </div>
+                          <span className="text-sm text-gray-600">{product.quantita} unità</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Add New Revenue Form */}
