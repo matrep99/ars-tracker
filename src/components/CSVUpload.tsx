@@ -83,34 +83,57 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
     if (!adsSpend || parseFloat(adsSpend) <= 0) return;
 
     try {
-      // Save ads spend to campaigns table
-      const { data, error } = await supabase
+      // Check if campaign already exists for this month
+      const { data: existingCampaign, error: checkError } = await supabase
         .from('campaigns')
-        .upsert({
-          titolo: `Spesa Ads ${selectedMonth}`,
-          descrizione: `Spesa pubblicitaria per ${selectedMonth}`,
-          budget: parseFloat(adsSpend),
-          fatturato: 0,
-          ordini: parseInt(totalOrders) || 0,
-          prodotti: 0,
-          data: `${selectedMonth}-01`,
-          roi: 0,
-          valore_medio_ordine: 0,
-          prodotti_medi_per_ordine: 0
-        }, { 
-          onConflict: 'data',
-          ignoreDuplicates: false 
-        })
-        .select()
+        .select('*')
+        .eq('data', `${selectedMonth}-01`)
         .single();
 
-      if (error) {
-        console.error('Error saving ads spend:', error);
-        throw error;
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing campaign:', checkError);
+        throw checkError;
       }
 
-      console.log('Ads spend saved to campaigns:', data);
-      return data;
+      const campaignData = {
+        titolo: `Spesa Ads ${selectedMonth}`,
+        descrizione: `Spesa pubblicitaria per ${selectedMonth}`,
+        budget: parseFloat(adsSpend),
+        fatturato: 0,
+        ordini: parseInt(totalOrders) || 0,
+        prodotti: parsedData.length,
+        data: `${selectedMonth}-01`,
+        roi: 0,
+        valore_medio_ordine: 0,
+        prodotti_medi_per_ordine: 0
+      };
+
+      let campaignResult;
+      if (existingCampaign) {
+        // Update existing campaign
+        const { data, error } = await supabase
+          .from('campaigns')
+          .update(campaignData)
+          .eq('id', existingCampaign.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        campaignResult = data;
+      } else {
+        // Insert new campaign
+        const { data, error } = await supabase
+          .from('campaigns')
+          .insert(campaignData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        campaignResult = data;
+      }
+
+      console.log('Ads spend saved to campaigns:', campaignResult);
+      return campaignResult;
     } catch (error) {
       console.error('Error saving ads spend:', error);
       throw error;
@@ -138,15 +161,18 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
 
     setIsLoading(true);
     try {
-      // Save ads spend first if provided
+      // First delete existing data for this month to avoid duplicates
+      await deleteMonthlyOrdersByMonth(selectedMonth + '-01');
+
+      // Save ads spend if provided
       if (adsSpend && parseFloat(adsSpend) > 0) {
         await saveAdsSpend();
       }
 
-      // Save monthly order data with proper product names
+      // Prepare monthly order data with proper product names and ensure no duplicates
       const monthlyOrderData = parsedData.map(row => ({
         month: selectedMonth + '-01',
-        prodotto: row.prodotto.trim(), // Ensure product name is properly trimmed and saved
+        prodotto: row.prodotto.trim().toLowerCase(), // Normalize product names
         pezzi_totali: row.pezzi_totali,
         importo_totale_iva_inclusa: row.importo_totale_iva_inclusa,
         iva: row.iva,
@@ -155,20 +181,27 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
         total_orders: parseInt(totalOrders)
       }));
 
-      console.log('Saving monthly order data with product names:', monthlyOrderData);
+      console.log('Saving monthly order data with normalized product names:', monthlyOrderData);
+      
+      // Save the data to database
       const savedData = await saveMonthlyOrderData(monthlyOrderData);
+      console.log('Data successfully saved:', savedData);
       
       toast({
         title: "Dati salvati con successo",
         description: `${parsedData.length} record salvati per ${selectedMonth} con ${totalOrders} ordini totali${adsSpend ? ` e ${adsSpend}€ di spesa ads` : ''}`
       });
       
+      // Clear form and refresh data
       setParsedData([]);
       setParseErrors([]);
       setTotalOrders('');
       setAdsSpend('');
+      
+      // Refresh uploaded data and notify parent
       await loadUploadedData();
       onDataUploaded();
+      
     } catch (error) {
       console.error('Error saving data:', error);
       toast({
@@ -186,6 +219,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
       const allData = await getAllMonthlyOrders();
       const monthData = allData.filter(item => item.month.startsWith(selectedMonth));
       setUploadedData(monthData);
+      console.log('Loaded uploaded data for month:', selectedMonth, monthData);
     } catch (error) {
       console.error('Error loading uploaded data:', error);
     }
@@ -349,7 +383,7 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
               variant="destructive"
               onClick={handleDeleteMonth}
               disabled={isLoading}
-              className="text-red-600 hover:text-red-700"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Elimina Dati Mese
@@ -403,10 +437,10 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
                       <TableCell className="text-right">€{row.imponibile_totale.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
                         <Button
-                          variant="ghost"
+                          variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteRow(row.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="bg-red-600 hover:bg-red-700 text-white"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -440,9 +474,9 @@ export const CSVUpload = ({ onDataUploaded }: CSVUploadProps) => {
               </div>
               <div className="flex gap-2">
                 <Button
-                  variant="outline"
+                  variant="destructive"
                   onClick={clearData}
-                  className="text-red-600"
+                  className="bg-red-600 hover:bg-red-700 text-white"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Cancella
