@@ -51,6 +51,7 @@ export const PaymentMethodsManager = ({ dateRange }: PaymentMethodsManagerProps)
       }
       
       setPaymentMethods(data);
+      console.log('Loaded payment methods:', data);
     } catch (error) {
       console.error('Error loading payment methods:', error);
       toast({
@@ -66,10 +67,12 @@ export const PaymentMethodsManager = ({ dateRange }: PaymentMethodsManagerProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Submitting payment method data:', newEntry);
+    
     if (!newEntry.month || !newEntry.payment_method.trim() || newEntry.orders_count <= 0) {
       toast({
         title: "Dati mancanti",
-        description: "Compila tutti i campi richiesti",
+        description: "Compila tutti i campi richiesti con valori validi",
         variant: "destructive"
       });
       return;
@@ -77,24 +80,33 @@ export const PaymentMethodsManager = ({ dateRange }: PaymentMethodsManagerProps)
 
     try {
       setIsLoading(true);
-      await savePaymentMethodData({
+      
+      const dataToSave = {
         month: newEntry.month,
         payment_method: newEntry.payment_method.trim(),
         orders_count: newEntry.orders_count
-      });
+      };
       
+      console.log('Saving payment method data:', dataToSave);
+      
+      await savePaymentMethodData(dataToSave);
+      
+      // Reset form
       setNewEntry({
         month: '',
         payment_method: '',
         orders_count: 0
       });
       
+      // Reload data to show new entry
       await loadPaymentMethods();
       
       toast({
         title: "Dati salvati",
         description: "I dati del metodo di pagamento sono stati salvati con successo"
       });
+      
+      console.log('Payment method data saved successfully');
     } catch (error) {
       console.error('Error saving payment method data:', error);
       toast({
