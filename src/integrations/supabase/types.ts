@@ -264,6 +264,33 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          created_at: string
+          id: string
+          month: string
+          orders_count: number
+          payment_method: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: string
+          orders_count?: number
+          payment_method: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: string
+          orders_count?: number
+          payment_method?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_costs: {
         Row: {
           created_at: string

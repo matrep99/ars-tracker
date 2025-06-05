@@ -30,6 +30,7 @@ import {
 } from '@/lib/supabaseService';
 import { getAllAmazonRevenue, getAmazonRevenueByDateRange } from '@/lib/amazonRevenueService';
 import { getAllMonthlyOrders, getMonthlyOrdersByDateRange } from '@/lib/monthlyOrderService';
+import { PaymentMethodsManager } from '@/components/PaymentMethodsManager';
 
 export interface DateRange {
   startDate: string;
@@ -334,12 +335,13 @@ const Index = () => {
           </div>
 
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="campaigns">Campagne</TabsTrigger>
               <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
               <TabsTrigger value="amazon">Amazon</TabsTrigger>
               <TabsTrigger value="margins">Margini & Costi</TabsTrigger>
+              <TabsTrigger value="payments">Pagamenti</TabsTrigger>
               {!isReadOnly && <TabsTrigger value="add">Aggiungi Dati</TabsTrigger>}
             </TabsList>
 
@@ -442,6 +444,10 @@ const Index = () => {
 
             <TabsContent value="margins" className="space-y-6">
               <IntegratedMarginManager />
+            </TabsContent>
+
+            <TabsContent value="payments" className="space-y-6">
+              <PaymentMethodsManager dateRange={dateRange} />
             </TabsContent>
 
             {!isReadOnly && (

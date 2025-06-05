@@ -29,10 +29,17 @@ export const ProductRanking = () => {
     }
   };
 
+  // Filter out markup and shipping entries
+  const filteredOrders = monthlyOrders.filter(order => 
+    !order.prodotto.toLowerCase().includes('markup') && 
+    !order.prodotto.toLowerCase().includes('shipping') &&
+    !order.prodotto.toLowerCase().includes('spedizione')
+  );
+
   const aggregateProducts = () => {
     const productMap = new Map<string, number>();
     
-    monthlyOrders.forEach(order => {
+    filteredOrders.forEach(order => {
       const current = productMap.get(order.prodotto) || 0;
       productMap.set(order.prodotto, current + order.pezzi_totali);
     });
@@ -46,7 +53,7 @@ export const ProductRanking = () => {
   const getMonthlyBreakdown = () => {
     const monthlyData = new Map<string, Map<string, number>>();
     
-    monthlyOrders.forEach(order => {
+    filteredOrders.forEach(order => {
       const monthKey = format(parseISO(order.month), 'MMM yyyy', { locale: it });
       
       if (!monthlyData.has(order.prodotto)) {
@@ -60,7 +67,7 @@ export const ProductRanking = () => {
 
     // Get all unique months
     const allMonths = new Set<string>();
-    monthlyOrders.forEach(order => {
+    filteredOrders.forEach(order => {
       const monthKey = format(parseISO(order.month), 'MMM yyyy', { locale: it });
       allMonths.add(monthKey);
     });
@@ -88,7 +95,7 @@ export const ProductRanking = () => {
   const getTopProductsWithMonthlyTotals = () => {
     const productTotals = new Map<string, { total: number; monthlyData: Map<string, number> }>();
     
-    monthlyOrders.forEach(order => {
+    filteredOrders.forEach(order => {
       const monthKey = format(parseISO(order.month), 'MMM yyyy', { locale: it });
       
       if (!productTotals.has(order.prodotto)) {
@@ -113,7 +120,7 @@ export const ProductRanking = () => {
   const topProductsWithMonthly = getTopProductsWithMonthlyTotals();
 
   // Get unique months for display
-  const uniqueMonths = Array.from(new Set(monthlyOrders.map(order => 
+  const uniqueMonths = Array.from(new Set(filteredOrders.map(order => 
     format(parseISO(order.month), 'MMM yyyy', { locale: it })
   ))).sort();
 
@@ -158,7 +165,7 @@ export const ProductRanking = () => {
           <CardTitle>Classifica Prodotti Più Venduti</CardTitle>
           <CardDescription>
             {viewMode === 'total' 
-              ? 'I 10 prodotti con il maggior numero di vendite totali'
+              ? 'I 10 prodotti con il maggior numero di vendite totali (esclusi markup e spedizioni)'
               : 'Andamento vendite mensili dei prodotti più venduti'
             }
           </CardDescription>
@@ -193,14 +200,14 @@ export const ProductRanking = () => {
                     tick={{ fontSize: 12 }}
                   />
                   <Tooltip 
-                    formatter={(value: number) => [value, 'Quantità Venduta']}
+                    formatter={(value: number) => [value, 'Unità Vendute']}
                     labelFormatter={(label) => `Prodotto: ${label}`}
                   />
                   <Bar dataKey="quantita" fill="#10b981" />
                 </BarChart>
               </ResponsiveContainer>
 
-              {/* Detailed breakdown table */}
+              {/* Detailed breakdown table with monthly totals */}
               <div className="space-y-4">
                 <h4 className="text-lg font-semibold">Dettaglio Vendite per Mese</h4>
                 <div className="space-y-3">
