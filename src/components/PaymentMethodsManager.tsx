@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Plus } from 'lucide-react';
@@ -19,15 +18,6 @@ import {
   PaymentMethodData 
 } from '@/lib/paymentMethodService';
 import { DateRange } from '@/pages/Index';
-
-const PAYMENT_METHODS = [
-  'PayPal',
-  'Carta di Credito',
-  'Bonifico Bancario',
-  'Contrassegno',
-  'Contanti',
-  'Altro'
-];
 
 const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -76,7 +66,7 @@ export const PaymentMethodsManager = ({ dateRange }: PaymentMethodsManagerProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newEntry.month || !newEntry.payment_method || newEntry.orders_count <= 0) {
+    if (!newEntry.month || !newEntry.payment_method.trim() || newEntry.orders_count <= 0) {
       toast({
         title: "Dati mancanti",
         description: "Compila tutti i campi richiesti",
@@ -87,7 +77,11 @@ export const PaymentMethodsManager = ({ dateRange }: PaymentMethodsManagerProps)
 
     try {
       setIsLoading(true);
-      await savePaymentMethodData(newEntry);
+      await savePaymentMethodData({
+        month: newEntry.month,
+        payment_method: newEntry.payment_method.trim(),
+        orders_count: newEntry.orders_count
+      });
       
       setNewEntry({
         month: '',
@@ -177,19 +171,14 @@ export const PaymentMethodsManager = ({ dateRange }: PaymentMethodsManagerProps)
               </div>
               <div>
                 <Label htmlFor="payment-method">Metodo di Pagamento</Label>
-                <Select 
-                  value={newEntry.payment_method} 
-                  onValueChange={(value) => setNewEntry(prev => ({ ...prev, payment_method: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleziona metodo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map(method => (
-                      <SelectItem key={method} value={method}>{method}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="payment-method"
+                  type="text"
+                  placeholder="es. PayPal, Carta di Credito..."
+                  value={newEntry.payment_method}
+                  onChange={(e) => setNewEntry(prev => ({ ...prev, payment_method: e.target.value }))}
+                  required
+                />
               </div>
               <div>
                 <Label htmlFor="orders-count">Numero Ordini</Label>

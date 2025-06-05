@@ -341,7 +341,7 @@ const Index = () => {
               <TabsTrigger value="products">Classifica Prodotti</TabsTrigger>
               <TabsTrigger value="amazon">Amazon</TabsTrigger>
               <TabsTrigger value="margins">Margini & Costi</TabsTrigger>
-              <TabsTrigger value="payments">Pagamenti</TabsTrigger>
+              <TabsTrigger value="payments">Metodi di Pagamento</TabsTrigger>
               {!isReadOnly && <TabsTrigger value="add">Aggiungi Dati</TabsTrigger>}
             </TabsList>
 
